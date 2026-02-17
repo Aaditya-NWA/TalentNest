@@ -1,36 +1,29 @@
-﻿// RequirementService/Models/Requirement.cs
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace RequirementService.Models;
-
-[Table("Requirements")]
-[ExcludeFromCodeCoverage]
-public class Requirement
+namespace RequirementService.Models
 {
-    [Key]
-    public int Id { get; set; }
+    public class Requirement
+    {
+        [Key]
+        public int Id { get; set; }
 
-    [Required]
-    [MaxLength(100)]
-    public string Project { get; set; } = string.Empty;
+        [Required]
+        public string Project { get; set; } = string.Empty;
 
-    [Required]
-    [MaxLength(500)]
-    public string SkillsNeeded { get; set; } = string.Empty;
+        [Required]
+        public string SkillsNeeded { get; set; } = string.Empty;
 
-    [Required]
-    [Range(0, 600)]
-    public int ExperienceMonths { get; set; }
+        [Range(0, int.MaxValue)]
+        public int MinExperienceMonths { get; set; }
 
-    [Required]
-    public DateTime AvailabilityWindow { get; set; }
+        [Range(0, int.MaxValue)]
+        public int MaxExperienceMonths { get; set; }
 
-    [Required]
-    public bool ClientInterviewRequired { get; set; }
+        public DateTime AvailabilityStart { get; set; }
+        public DateTime AvailabilityEnd { get; set; }
 
-    // Audit fields
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAt { get; set; }
+        public bool ClientInterviewRequired { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+    }
 }

@@ -30,45 +30,35 @@ namespace RequirementService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("AvailabilityWindow")
+                    b.Property<DateTime>("AvailabilityEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("AvailabilityStart")
                         .HasColumnType("datetime2");
 
                     b.Property<bool>("ClientInterviewRequired")
                         .HasColumnType("bit");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
+                        .HasColumnType("datetime2");
 
-                    b.Property<int>("ExperienceMonths")
+                    b.Property<int>("MaxExperienceMonths")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MinExperienceMonths")
                         .HasColumnType("int");
 
                     b.Property<string>("Project")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SkillsNeeded")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AvailabilityWindow")
-                        .HasDatabaseName("IX_Requirements_Availability");
-
-                    b.HasIndex("Project")
-                        .HasDatabaseName("IX_Requirements_Project");
-
-                    b.HasIndex("SkillsNeeded")
-                        .HasDatabaseName("IX_Requirements_Skills");
-
-                    b.ToTable("Requirements", (string)null);
+                    b.ToTable("Requirements");
                 });
 #pragma warning restore 612, 618
         }

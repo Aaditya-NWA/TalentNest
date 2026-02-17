@@ -1,15 +1,14 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿namespace RequirementService.DTOs.Responses;
 
-namespace RequirementService.DTOs.Responses;
-
-[ExcludeFromCodeCoverage]
 public class RequirementResponse
 {
     public int Id { get; set; }
     public string Project { get; set; } = string.Empty;
     public string SkillsNeeded { get; set; } = string.Empty;
-    public int ExperienceMonths { get; set; }
-    public DateTime AvailabilityWindow { get; set; }
+    public int MinExperienceMonths { get; set; }
+    public int MaxExperienceMonths { get; set; }
+    public DateTime AvailabilityStart { get; set; }
+    public DateTime AvailabilityEnd { get; set; }
     public bool ClientInterviewRequired { get; set; }
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
