@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="READme.md" />
+  </Folder>
+  <Project Path="../GatewayAPI/GatewayAPI.csproj" />
+  <Project Path="CandidateService/CandidateService.csproj" Id="f75d4b69-fe7b-4128-bf7a-e5225c71a16c" />
+  <Project Path="InterviewService/InterviewService.csproj" Id="eb2b932d-e3b4-49a4-aa24-24c871923cc7" />
+  <Project Path="ReportService/ReportService.csproj" Id="389b105c-0351-44cf-be68-9da8ee1af5ad" />
+  <Project Path="RequirementService/RequirementService.csproj" Id="efd6756f-4859-4a64-875e-ceddec009e0d" />
+</Solution>

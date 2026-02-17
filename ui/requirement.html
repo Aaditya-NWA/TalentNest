@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Requirement</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        input, button {
+            display: block;
+            margin: 10px 0;
+            padding: 8px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Add Requirement</h1>
+
+    <input id="title" placeholder="Title" />
+    <input id="skill" placeholder="Skill Set" />
+    <input id="experience" type="number" placeholder="Experience (months)" />
+    <input id="positions" type="number" placeholder="Open Positions" />
+
+    <button onclick="submitRequirement()">Create</button>
+
+    <script>
+function submitRequirement() {
+  fetch("https://localhost:7221/api/requirements", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: title.value,
+      skillSet: skill.value,
+      experienceMonths: Number(experience.value),
+      openPositions: Number(positions.value)
+    })
+  })
+  .then(r => r.ok ? alert("Requirement created") : alert("Failed"))
+}
+    </script>
+
+</body>
+</html>

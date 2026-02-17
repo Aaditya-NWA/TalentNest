@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Schedule Interview</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        input, button {
+            display: block;
+            margin: 10px 0;
+            padding: 8px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Schedule Interview</h1>
+
+    <input id="candidateId" type="number" placeholder="Candidate ID" />
+    <input id="date" type="datetime-local" />
+    <input id="type" placeholder="Interview Type" />
+    <input id="interviewer" placeholder="Interviewer" />
+
+    <button onclick="schedule()">Schedule</button>
+
+    <script>
+function schedule() {
+  fetch("https://localhost:7221/api/interviews", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      candidateId: Number(candidateId.value),
+      interviewDate: date.value,
+      interviewType: type.value,
+      interviewer: interviewer.value
+    })
+  })
+  .then(r => r.ok ? alert("Interview scheduled") : alert("Failed"))
+}
+    </script>
+
+</body>
+</html>

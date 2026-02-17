@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Candidate</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        input, button {
+            display: block;
+            margin: 10px 0;
+            padding: 8px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Add Candidate</h1>
+
+    <input id="name" placeholder="Name" />
+    <input id="email" placeholder="Email" />
+    <input id="skill" placeholder="Skill Set" />
+    <input id="experience" type="number" placeholder="Experience (months)" />
+    <input id="date" type="date" />
+    <input id="level" placeholder="Primary Skill Level" />
+
+    <button onclick="submitCandidate()">Create</button>
+
+    <hr />
+
+    <h2>Bulk Upload Candidates</h2>
+
+    <input type="file" id="bulkFiles" accept=".json" multiple />
+    <button onclick="bulkUpload()">Upload JSON</button>
+
+    <script>
+        function submitCandidate() {
+            const payload = {
+                name: document.getElementById("name").value,
+                mailId: document.getElementById("email").value,
+                skillSet: document.getElementById("skill").value,
+                experienceMonths: Number(document.getElementById("experience").value),
+                availabilityDate: new Date(
+                    document.getElementById("date").value + "T00:00:00"
+                ).toISOString(),
+                primarySkillLevel: document.getElementById("level").value
+            };
+
+            fetch("/api/candidates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+                .then(async r => {
+                    if (!r.ok) {
+                        console.error(await r.text());
+                        alert("Failed");
+                        return;
+                    }
+                    alert("Candidate created");
+                });
+        }
+
+        async function bulkUpload() {
+            const input = document.getElementById("bulkFiles");
+            const files = input.files;
+
+            if (!files.length) {
+                alert("Please select at least one JSON file");
+                return;
+            }
+
+            const allCandidates = [];
+
+            for (const file of files) {
+                const text = await file.text();
+                let json;
+
+                try {
+                    json = JSON.parse(text);
+                } catch {
+                    alert(`Invalid JSON in ${file.name}`);
+                    return;
+                }
+
+                // single file ? many candidates
+                if (Array.isArray(json)) {
+                    allCandidates.push(...json);
+                }
+                // many files ? single candidate each
+                else if (typeof json === "object") {
+                    allCandidates.push(json);
+                }
+                else {
+                    alert(`Unsupported format in ${file.name}`);
+                    return;
+                }
+            }
+
+            const response = await fetch("/api/candidates/bulk-json", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(allCandidates)
+            });
+
+            if (response.ok) {
+                alert(`Uploaded ${allCandidates.length} candidates`);
+            } else {
+                alert("Bulk upload failed");
+            }
+        }
+    </script>
+
+</body>
+</html>

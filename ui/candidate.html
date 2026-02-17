@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Candidate</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        input, button {
+            display: block;
+            margin: 10px 0;
+            padding: 8px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Add Candidate</h1>
+
+    <input id="name" placeholder="Name" />
+    <input id="email" placeholder="Email" />
+    <input id="skill" placeholder="Skill Set" />
+    <input id="experience" type="number" placeholder="Experience (months)" />
+    <input id="date" type="date" />
+    <input id="level" placeholder="Primary Skill Level" />
+
+    <button onclick="submitCandidate()">Create</button>
+
+    <script>
+function submitCandidate() {
+  fetch("https://localhost:7221/api/candidates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: name.value,
+      mailId: email.value,
+      skillSet: skill.value,
+      experienceMonths: Number(experience.value),
+      availabilityDate: date.value,
+      primarySkillLevel: level.value
+    })
+  })
+  .then(r => r.ok ? alert("Candidate created") : alert("Failed"))
+}
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Candidate Management</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .card {
+      display: inline-block;
+      padding: 20px;
+      margin: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      width: 200px;
+      text-align: center;
+    }
+    .value { font-size: 28px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h1>Dashboard</h1>
+
+<div class="card">
+  <div>Total Candidates</div>
+  <div id="candidates" class="value">–</div>
+</div>
+
+<div class="card">
+  <div>Total Interviews</div>
+  <div id="interviews" class="value">–</div>
+</div>
+
+<div class="card">
+  <div>Scheduled Interviews</div>
+  <div id="scheduled" class="value">–</div>
+</div>
+
+<div class="card">
+  <div>Open Requirements</div>
+  <div id="requirements" class="value">–</div>
+</div>
+
+<script>
+  fetch("https://localhost:7221/api/reports/summary") // Gateway URL
+    .then(r => r.json())
+    .then(d => {
+      candidates.innerText = d.totalCandidates;
+      interviews.innerText = d.totalInterviews;
+      scheduled.innerText = d.scheduledInterviews;
+      requirements.innerText = d.openRequirements;
+    })
+    .catch(() => alert("Backend not reachable"));
+</script>
+
+</body>
+</html>

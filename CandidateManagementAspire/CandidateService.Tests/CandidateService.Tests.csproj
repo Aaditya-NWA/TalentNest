@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+
+		<IsTestProject>true</IsTestProject>
+		<IsPackable>false</IsPackable>
+
+		<!-- Stability in locked-down environments -->
+		<DisableShadowCopy>true</DisableShadowCopy>
+	</PropertyGroup>
+
+	<!-- Project under test -->
+	<ItemGroup>
+		<ProjectReference Include="..\..\CandidateManagement\CandidateService\CandidateService.csproj" />
+	</ItemGroup>
+
+	<!-- Test framework -->
+	<ItemGroup>
+		<PackageReference Include="FluentAssertions" Version="8.8.0" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+		<PackageReference Include="NUnit" Version="3.14.0" />
+		<PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+		<PackageReference Include="NUnit.Analyzers" Version="3.9.0" />
+	</ItemGroup>
+
+	<!-- Test helpers -->
+	<ItemGroup>
+		<PackageReference Include="Moq" Version="4.20.72" />
+		<PackageReference Include="Bogus" Version="35.6.5" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.0" />
+	</ItemGroup>
+
+	<!-- COVERAGE: MSBuild-based (WDAC safe) -->
+	<ItemGroup>
+		<PackageReference Include="coverlet.msbuild" Version="6.0.2" />
+	</ItemGroup>
+
+</Project>
