@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using FluentAssertions;
 
 
+
 [ExcludeFromCodeCoverage]
 
 
@@ -442,6 +443,78 @@ public class CandidateControllerTests
         pageSize.Should().Be(50);
 
     }
+
+    [Test]
+    public void Delete_ShouldThrow_WhenIdIsNegative()
+    {
+        var context = CreateDb();
+        var mockService = new Mock<ICandidateBulkInsertService>();
+        var controller = new CandidateController(context, mockService.Object);
+
+        Action act = () => controller.Delete(-1).GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public async Task Update_ShouldReturnBadRequest_WhenExperienceNegative()
+    {
+        var context = CreateDb();
+        var mockService = new Mock<ICandidateBulkInsertService>();
+
+        var candidate = new Candidate
+        {
+            Name = "Test",
+            MailId = "a@test.com",
+            SkillSet = "C#",
+            ExperienceMonths = 5,
+            AvailabilityDate = DateTime.Today
+        };
+
+        context.Candidates.Add(candidate);
+        await context.SaveChangesAsync();
+
+        var controller = new CandidateController(context, mockService.Object);
+
+        var request = new CreateCandidateRequest
+        {
+            ExperienceMonths = -5
+        };
+
+        var result = await controller.Update(candidate.Id, request);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Test]
+    public void GetById_ShouldThrow_WhenIdIsNegative()
+    {
+        var context = CreateDb();
+        var mockService = new Mock<ICandidateBulkInsertService>();
+        var controller = new CandidateController(context, mockService.Object);
+
+        Action act = () => controller.GetById(-1).GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public void Update_ShouldThrow_WhenIdIsNegative()
+    {
+        var context = CreateDb();
+        var mockService = new Mock<ICandidateBulkInsertService>();
+        var controller = new CandidateController(context, mockService.Object);
+
+        var request = new CreateCandidateRequest();
+
+        Action act = () => controller.Update(-1, request).GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+
+
+
 
 
 

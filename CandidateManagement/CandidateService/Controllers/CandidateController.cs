@@ -57,6 +57,8 @@ namespace CandidateService.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
+            if (id < 0)
+                throw new ArgumentException("Id cannot be negative");
             var candidate = await _context.Candidates.FindAsync(id);
             if (candidate == null)
                 return NotFound();
@@ -68,9 +70,11 @@ namespace CandidateService.Controllers
         [HttpGet]
 
         public async Task<IActionResult> GetAll(
+
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50)
         {
+
             if (page <= 0) page = 1;
             if (pageSize <= 0 || pageSize > 200) pageSize = 50;
 
@@ -186,9 +190,12 @@ namespace CandidateService.Controllers
         }
 
         // UPDATE
+
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, CreateCandidateRequest request)
         {
+            if (id < 0)
+                throw new ArgumentException("Id cannot be negative");
             var candidate = await _context.Candidates.FindAsync(id);
             if (candidate == null)
                 return NotFound();
@@ -217,7 +224,7 @@ namespace CandidateService.Controllers
             {
                 return Conflict("Duplicate candidate (MailId + SkillSet + AvailabilityDate)");
             }
-
+           
             candidate.Name = request.Name;
             candidate.MailId = request.MailId;
             candidate.SkillSet = request.SkillSet;
@@ -231,8 +238,11 @@ namespace CandidateService.Controllers
 
         // DELETE
         [HttpDelete("{id}")]
+
         public async Task<IActionResult> Delete(int id)
         {
+            if (id < 0)
+                throw new ArgumentException("Id cannot be negative");
             var candidate = await _context.Candidates.FindAsync(id);
             if (candidate == null)
                 return NotFound();

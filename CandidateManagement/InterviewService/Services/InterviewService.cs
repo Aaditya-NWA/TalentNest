@@ -47,6 +47,8 @@ public class InterviewService : IInterviewService
     // ============ READ ============
     public async Task<InterviewResponse?> GetInterviewByIdAsync(int id)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         var interview = await _interviewRepository.GetByIdAsync(id);
         return interview == null ? null : MapToResponse(interview);
     }
@@ -60,6 +62,8 @@ public class InterviewService : IInterviewService
     // ============ UPDATE ============
     public async Task<InterviewResponse?> UpdateInterviewAsync(int id, UpdateInterviewRequest request)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         var existing = await _interviewRepository.GetByIdAsync(id);
         if (existing == null)
             return null;
@@ -88,6 +92,8 @@ public class InterviewService : IInterviewService
 
     public async Task<InterviewResponse> SetInterviewOutcomeAsync(int id, InterviewOutcome outcome, DecisionMaker decisionMaker)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         var interview = await _interviewRepository.GetByIdAsync(id);
         if (interview == null)
             throw new KeyNotFoundException($"Interview with ID {id} not found.");
@@ -104,6 +110,8 @@ public class InterviewService : IInterviewService
     // ============ DELETE ============
     public async Task<bool> DeleteInterviewAsync(int id)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         return await _interviewRepository.DeleteAsync(id);
     }
 

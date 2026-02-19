@@ -60,6 +60,8 @@ public class InterviewsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetInterviewById(int id)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         var interview = await _interviewService.GetInterviewByIdAsync(id);
 
         if (interview == null)
@@ -88,6 +90,8 @@ public class InterviewsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateInterview(int id, [FromBody] UpdateInterviewRequest request)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         var validationResult = await _updateInterviewValidator.ValidateAsync(request);
         if (!validationResult.IsValid)
         {
@@ -111,6 +115,8 @@ public class InterviewsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteInterview(int id)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         var deleted = await _interviewService.DeleteInterviewAsync(id);
 
         if (!deleted)

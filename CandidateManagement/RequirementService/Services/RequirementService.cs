@@ -10,7 +10,6 @@ using System.Globalization;
 
 namespace RequirementService.Services;
 
-[ExcludeFromCodeCoverage]
 public class RequirementService : IRequirementService
 {
     private readonly RequirementDbContext _context;
@@ -72,7 +71,9 @@ public class RequirementService : IRequirementService
             AvailabilityStart = startDate,
             AvailabilityEnd = endDate,
             ClientInterviewRequired = request.ClientInterviewRequired,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            RequiredPrimarySkillLevel = request.RequiredPrimarySkillLevel,
+
         };
 
         _context.Requirements.Add(requirement);
@@ -84,6 +85,8 @@ public class RequirementService : IRequirementService
     // ============ READ ============
     public async Task<RequirementResponse?> GetRequirementByIdAsync(int id)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
         var requirement = await _context.Requirements.FindAsync(id);
         return requirement == null ? null : MapToResponse(requirement);
     }
@@ -110,7 +113,75 @@ public class RequirementService : IRequirementService
             AvailabilityStart = requirement.AvailabilityStart,
             AvailabilityEnd = requirement.AvailabilityEnd,
             ClientInterviewRequired = requirement.ClientInterviewRequired,
-            CreatedAt = requirement.CreatedAt
+            CreatedAt = requirement.CreatedAt,
+            RequiredPrimarySkillLevel = requirement.RequiredPrimarySkillLevel
         };
     }
+    // ============ UPDATE ============
+    [ExcludeFromCodeCoverage]
+    public async Task<RequirementResponse?> UpdateRequirementAsync(int id, CreateRequirementRequest request)
+    {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
+
+        var requirement = await _context.Requirements.FindAsync(id);
+
+        if (requirement == null)
+            return null;
+
+        // -------- Validate Experience Range --------
+        if (string.IsNullOrWhiteSpace(request.ExperienceRange))
+            throw new ArgumentException("ExperienceRange is required in format: min,max");
+
+        var expParts = request.ExperienceRange.Split(',');
+
+        if (expParts.Length != 2 ||
+            string.IsNullOrWhiteSpace(expParts[0]) ||
+            string.IsNullOrWhiteSpace(expParts[1]))
+            throw new ArgumentException("ExperienceRange must contain two values: min,max");
+
+        if (!int.TryParse(expParts[0], out int minExp) ||
+            !int.TryParse(expParts[1], out int maxExp))
+            throw new ArgumentException("ExperienceRange must contain valid integers");
+
+        if (minExp < 0 || maxExp < 0)
+            throw new ArgumentException("Experience values cannot be negative");
+
+        if (minExp >= maxExp)
+            throw new ArgumentException("Min experience must be less than max experience");
+
+        // -------- Validate Availability Window --------
+        if (string.IsNullOrWhiteSpace(request.AvailabilityWindow))
+            throw new ArgumentException("AvailabilityWindow is required in format: start,end");
+
+        var availParts = request.AvailabilityWindow.Split(',');
+
+        if (availParts.Length != 2 ||
+            string.IsNullOrWhiteSpace(availParts[0]) ||
+            string.IsNullOrWhiteSpace(availParts[1]))
+            throw new ArgumentException("AvailabilityWindow must contain two values: start,end");
+
+        if (!DateTime.TryParse(availParts[0], out DateTime startDate) ||
+            !DateTime.TryParse(availParts[1], out DateTime endDate))
+            throw new ArgumentException("AvailabilityWindow must contain valid dates");
+
+        if (startDate > endDate)
+            throw new ArgumentException("Availability start cannot be after end date");
+
+        // -------- Update Entity --------
+        requirement.Project = request.Project;
+        requirement.SkillsNeeded = request.SkillsNeeded;
+        requirement.MinExperienceMonths = minExp;
+        requirement.MaxExperienceMonths = maxExp;
+        requirement.AvailabilityStart = startDate;
+        requirement.AvailabilityEnd = endDate;
+        requirement.ClientInterviewRequired = request.ClientInterviewRequired;
+        requirement.RequiredPrimarySkillLevel = request.RequiredPrimarySkillLevel;
+
+        await _context.SaveChangesAsync();
+
+        return MapToResponse(requirement);
+    }
+
+
 }

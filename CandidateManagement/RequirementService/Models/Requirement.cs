@@ -1,7 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RequirementService.Models
 {
+    [ExcludeFromCodeCoverage]
     public class Requirement
     {
         [Key]
@@ -25,5 +27,9 @@ namespace RequirementService.Models
         public bool ClientInterviewRequired { get; set; }
 
         public DateTime CreatedAt { get; set; }
+        [Required]
+        [RegularExpression("P[0-5]")]
+        public string RequiredPrimarySkillLevel { get; set; } = "P0";
+
     }
 }

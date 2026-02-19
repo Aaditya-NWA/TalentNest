@@ -42,6 +42,9 @@ public class FeedbackService : IFeedbackService
     // ============ READ ============
     public async Task<FeedbackResponse?> GetFeedbackByIdAsync(int id)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
+
         var feedback = await _feedbackRepository.GetByIdAsync(id);
         return feedback == null ? null : MapToResponse(feedback);
     }
@@ -78,6 +81,9 @@ public class FeedbackService : IFeedbackService
    
     public async Task<FeedbackResponse?> UpdateFeedbackAsync(int id, UpdateFeedbackRequest request)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
+
         var existing = await _feedbackRepository.GetByIdAsync(id);
         if (existing == null)
             return null;
@@ -95,6 +101,9 @@ public class FeedbackService : IFeedbackService
     // ============ DELETE ============
     public async Task<bool> DeleteFeedbackAsync(int id)
     {
+        if (id < 0)
+            throw new ArgumentException("Id cannot be negative");
+
         return await _feedbackRepository.DeleteAsync(id);
     }
 

@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using RequirementService.Clients;
+using RequirementService.Contracts.Clients;
 using RequirementService.Contracts.Services;
 using RequirementService.Data;
 using RequirementService.Services;
@@ -21,6 +23,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "Requirement Service API", Version = "v1" });
+});
+builder.Services.AddScoped<IMatchingService, MatchingService>();
+
+builder.Services.AddHttpClient<ICandidateClient, CandidateClient>(client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7199"); // CandidateService URL
 });
 
 var app = builder.Build();

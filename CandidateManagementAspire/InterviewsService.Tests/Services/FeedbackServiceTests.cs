@@ -541,6 +541,172 @@ public class FeedbackServiceTests
 
         act.Should().ThrowAsync<Exception>();
     }
+    [Test]
+    public void CreateFeedback_ShouldThrow_WhenInterviewNotFound()
+    {
+        var feedbackRepo = new Mock<IFeedbackRepository>();
+        var interviewRepo = new Mock<IInterviewRepository>();
+
+        interviewRepo.Setup(x => x.ExistsAsync(1))
+                     .ReturnsAsync(false);
+
+        var service = new FeedbackService(feedbackRepo.Object, interviewRepo.Object);
+
+        var request = new CreateFeedbackRequest
+        {
+            InterviewId = 1,
+            Comments = "Good",
+            RecommendedOutcome = InterviewOutcome.Selected,
+            CreatedBy = "HR"
+        };
+
+        Action act = () => service.CreateFeedbackAsync(request)
+                                  .GetAwaiter().GetResult();
+
+        act.Should().Throw<KeyNotFoundException>();
+    }
+    [Test]
+    public async Task CreateFeedback_ShouldReturnResponse_WhenValid()
+    {
+        var feedbackRepo = new Mock<IFeedbackRepository>();
+        var interviewRepo = new Mock<IInterviewRepository>();
+
+        interviewRepo.Setup(x => x.ExistsAsync(1))
+                     .ReturnsAsync(true);
+
+        feedbackRepo.Setup(x => x.CreateAsync(It.IsAny<Feedback>()))
+            .ReturnsAsync(new Feedback
+            {
+                Id = 1,
+                InterviewId = 1,
+                Comments = "Good",
+                RecommendedOutcome = InterviewOutcome.Selected,
+                CreatedBy = "HR"
+            });
+
+        var service = new FeedbackService(feedbackRepo.Object, interviewRepo.Object);
+
+        var result = await service.CreateFeedbackAsync(new CreateFeedbackRequest
+        {
+            InterviewId = 1,
+            Comments = "Good",
+            RecommendedOutcome = InterviewOutcome.Selected,
+            CreatedBy = "HR"
+        });
+
+        result.Should().NotBeNull();
+        result.Id.Should().Be(1);
+    }
+
+    [Test]
+    public void GetFeedbackById_ShouldThrow_WhenIdNegative()
+    {
+        var service = new FeedbackService(
+            Mock.Of<IFeedbackRepository>(),
+            Mock.Of<IInterviewRepository>());
+
+        Action act = () => service.GetFeedbackByIdAsync(-1)
+                                  .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public async Task GetFeedbackById_ShouldReturnNull_WhenNotFound()
+    {
+        var repo = new Mock<IFeedbackRepository>();
+        repo.Setup(x => x.GetByIdAsync(1))
+            .ReturnsAsync((Feedback?)null);
+
+        var service = new FeedbackService(repo.Object, Mock.Of<IInterviewRepository>());
+
+        var result = await service.GetFeedbackByIdAsync(1);
+
+        result.Should().BeNull();
+    }
+    [Test]
+    public void UpdateFeedback_ShouldThrow_WhenIdNegative()
+    {
+        var service = new FeedbackService(
+            Mock.Of<IFeedbackRepository>(),
+            Mock.Of<IInterviewRepository>());
+
+        Action act = () => service.UpdateFeedbackAsync(-1, new UpdateFeedbackRequest())
+                                  .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public async Task UpdateFeedback_ShouldReturnNull_WhenNotFound()
+    {
+        var repo = new Mock<IFeedbackRepository>();
+        repo.Setup(x => x.GetByIdAsync(1))
+            .ReturnsAsync((Feedback?)null);
+
+        var service = new FeedbackService(repo.Object, Mock.Of<IInterviewRepository>());
+
+        var result = await service.UpdateFeedbackAsync(1, new UpdateFeedbackRequest());
+
+        result.Should().BeNull();
+    }
+    [Test]
+    public async Task UpdateFeedback_ShouldUpdateFields_WhenValid()
+    {
+        var repo = new Mock<IFeedbackRepository>();
+
+        var existing = new Feedback
+        {
+            Id = 1,
+            InterviewId = 1,
+            Comments = "Old",
+            RecommendedOutcome = InterviewOutcome.Rejected
+        };
+
+        repo.Setup(x => x.GetByIdAsync(1))
+            .ReturnsAsync(existing);
+
+        repo.Setup(x => x.UpdateAsync(1, It.IsAny<Feedback>()))
+            .ReturnsAsync(existing);
+
+        var service = new FeedbackService(repo.Object, Mock.Of<IInterviewRepository>());
+
+        var result = await service.UpdateFeedbackAsync(1, new UpdateFeedbackRequest
+        {
+            Comments = "New",
+            RecommendedOutcome = InterviewOutcome.Selected
+        });
+
+        result.Should().NotBeNull();
+    }
+    [Test]
+    public void DeleteFeedback_ShouldThrow_WhenIdNegative()
+    {
+        var service = new FeedbackService(
+            Mock.Of<IFeedbackRepository>(),
+            Mock.Of<IInterviewRepository>());
+
+        Action act = () => service.DeleteFeedbackAsync(-1)
+                                  .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public async Task DeleteFeedback_ShouldReturnTrue_WhenDeleted()
+    {
+        var repo = new Mock<IFeedbackRepository>();
+        repo.Setup(x => x.DeleteAsync(1))
+            .ReturnsAsync(true);
+
+        var service = new FeedbackService(repo.Object, Mock.Of<IInterviewRepository>());
+
+        var result = await service.DeleteFeedbackAsync(1);
+
+        result.Should().BeTrue();
+    }
+
+
 
 
 

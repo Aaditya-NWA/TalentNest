@@ -1,9 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RequirementService.Contracts.Services;
 using RequirementService.Data;
 using RequirementService.DTOs.Requests;
 using RequirementService.DTOs.Responses;
 using RequirementService.Models;
+using RequirementService.Services;
+
 
 namespace RequirementService.Controllers
 {
@@ -11,11 +14,17 @@ namespace RequirementService.Controllers
     [Route("api/[controller]")]
     public class RequirementsController : ControllerBase
     {
+        private readonly IRequirementService _requirementService;
         private readonly RequirementDbContext _context;
 
-        public RequirementsController(RequirementDbContext context)
+        private readonly IMatchingService _matchingService;
+
+        public RequirementsController(RequirementDbContext context, IMatchingService matchingService, IRequirementService requirementService)
         {
             _context = context;
+            _matchingService = matchingService;
+            _requirementService = requirementService;
+
         }
 
         [HttpGet]
@@ -27,12 +36,16 @@ namespace RequirementService.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
+            if (id < 0)
+                throw new ArgumentException("Id cannot be negative");
+
             var requirement = await _context.Requirements.FindAsync(id);
             if (requirement == null)
                 return NotFound();
 
             return Ok(requirement);
         }
+
 
         [HttpPost]
         public async Task<IActionResult> Create(CreateRequirementRequest dto)
@@ -93,6 +106,7 @@ namespace RequirementService.Controllers
                 MaxExperienceMonths = maxExp,
                 AvailabilityStart = startDate,
                 AvailabilityEnd = endDate,
+                CreatedAt = DateTime.UtcNow,
                 ClientInterviewRequired = dto.ClientInterviewRequired
             };
 
@@ -103,10 +117,32 @@ namespace RequirementService.Controllers
                 new { id = requirement.Id }, requirement);
         }
 
+        // Update
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, CreateRequirementRequest request)
+        {
+            try
+            {
+                var updated = await _requirementService.UpdateRequirementAsync(id, request);
+
+                if (updated == null)
+                    return NotFound();
+
+                return Ok(updated);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
+            if (id < 0)
+                throw new ArgumentException("Id cannot be negative");
+
             var requirement = await _context.Requirements.FindAsync(id);
             if (requirement == null)
                 return NotFound();
@@ -116,5 +152,24 @@ namespace RequirementService.Controllers
 
             return NoContent();
         }
+
+        [HttpGet("{id}/match")]
+        public async Task<IActionResult> MatchCandidates(int id)
+        {
+            if (id < 0)
+                throw new ArgumentException("Id cannot be negative");
+
+            try
+            {
+                var matches = await _matchingService.MatchCandidatesAsync(id);
+                return Ok(matches);
+            }
+            catch (Exception ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+
     }
 }

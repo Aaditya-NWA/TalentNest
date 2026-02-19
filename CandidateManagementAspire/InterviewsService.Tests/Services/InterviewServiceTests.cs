@@ -15,6 +15,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 
+
+
 namespace InterviewService.Tests.Services;
 
 using InterviewSvc = InterviewService.Services.InterviewService;
@@ -673,6 +675,134 @@ public class InterviewServiceTests
 
         result.Should().NotBeNull();
     }
+    [Test]
+    public void GetInterviewById_ShouldThrow_WhenIdNegative()
+    {
+        var repo = new Mock<IInterviewRepository>();
+        var validation = new Mock<IInterviewValidationService>();
+
+        var service = new InterviewService.Services.InterviewService(repo.Object, validation.Object);
+
+
+        Action act = () => service.GetInterviewByIdAsync(-1).GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public void UpdateInterview_ShouldThrow_WhenIdNegative()
+    {
+        var repo = new Mock<IInterviewRepository>();
+        var validation = new Mock<IInterviewValidationService>();
+
+        var service = new InterviewSvc(repo.Object, validation.Object);
+
+        Action act = () => service.UpdateInterviewAsync(-1, new UpdateInterviewRequest())
+                                    .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public void SetOutcome_ShouldThrow_WhenIdNegative()
+    {
+        var repo = new Mock<IInterviewRepository>();
+        var validation = new Mock<IInterviewValidationService>();
+
+        var service = new InterviewSvc(repo.Object, validation.Object);
+
+        Action act = () => service.SetInterviewOutcomeAsync(
+                                -1,
+                                InterviewOutcome.Selected,
+                                DecisionMaker.Internal)
+                            .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public void SetOutcome_ShouldThrow_WhenInterviewNotFound()
+    {
+        var repo = new Mock<IInterviewRepository>();
+        var validation = new Mock<IInterviewValidationService>();
+
+        repo.Setup(r => r.GetByIdAsync(1))
+            .ReturnsAsync((Interview?)null);
+
+        var service = new InterviewSvc(repo.Object, validation.Object);
+
+        Action act = () => service.SetInterviewOutcomeAsync(
+                                1,
+                                InterviewOutcome.Selected,
+                                DecisionMaker.Internal)
+                            .GetAwaiter().GetResult();
+
+        act.Should().Throw<KeyNotFoundException>();
+    }
+    [Test]
+    public void DeleteInterview_ShouldThrow_WhenIdNegative()
+    {
+        var repo = new Mock<IInterviewRepository>();
+        var validation = new Mock<IInterviewValidationService>();
+
+        var service = new InterviewSvc(repo.Object, validation.Object);
+
+        Action act = () => service.DeleteInterviewAsync(-1)
+                                  .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public void CreateInterview_ShouldThrow_WhenValidationFails()
+    {
+        var repo = new Mock<IInterviewRepository>();
+        var validation = new Mock<IInterviewValidationService>();
+
+        validation.Setup(v => v.ValidateInterviewAsync(It.IsAny<Interview>()))
+            .ReturnsAsync((false, "Validation failed"));
+
+        var service = new InterviewSvc(repo.Object, validation.Object);
+
+        var request = new CreateInterviewRequest
+        {
+            CandidateId = 1,
+            RequirementId = 1,
+            Project = "Proj",
+            Account = "Acc",
+            Interviewer = "Int",
+            InterviewDate = DateTime.Today,
+            Level = 1
+        };
+
+        Action act = () => service.CreateInterviewAsync(request)
+                                  .GetAwaiter().GetResult();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Validation failed");
+    }
+    [Test]
+    public async Task UpdateInterview_ShouldReturnNull_WhenNotFound()
+    {
+        var repo = new Mock<IInterviewRepository>();
+        var validation = new Mock<IInterviewValidationService>();
+
+        repo.Setup(r => r.GetByIdAsync(1))
+            .ReturnsAsync((Interview?)null);
+
+        var service = new InterviewSvc(repo.Object, validation.Object);
+
+        var result = await service.UpdateInterviewAsync(1, new UpdateInterviewRequest());
+
+        result.Should().BeNull();
+    }
+
+
+
+
+
+
+
 
 
 }

@@ -5,6 +5,7 @@ using InterviewService.Contracts.Services;
 using InterviewService.Controllers;
 using InterviewService.DTOs.Requests.Interviews;
 using InterviewService.DTOs.Responses;
+using InterviewService.Models.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using NUnit.Framework;
@@ -184,4 +185,67 @@ public class InterviewsControllerTests
 
         result.Should().BeOfType<NoContentResult>();
     }
+    [Test]
+    public void GetInterviewById_ShouldThrow_WhenIdNegative()
+    {
+        _service.Setup(s => s.GetInterviewByIdAsync(-1))
+            .ThrowsAsync(new ArgumentException("Id cannot be negative"));
+
+        Action act = () => _controller.GetInterviewById(-1)
+            .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("Id cannot be negative");
+    }
+    [Test]
+    public void DeleteInterview_ShouldThrow_WhenIdNegative()
+    {
+        _service.Setup(s => s.DeleteInterviewAsync(-1))
+            .ThrowsAsync(new ArgumentException("Id cannot be negative"));
+
+        Action act = () => _controller.DeleteInterview(-1)
+            .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>();
+    }
+    [Test]
+    public async Task CreateInterview_ShouldThrow_When_ServiceThrowsUnexpected()
+    {
+        _createValidator.Setup(v => v.ValidateAsync(It.IsAny<CreateInterviewRequest>(), default))
+            .ReturnsAsync(new ValidationResult());
+
+        _service.Setup(s => s.CreateInterviewAsync(It.IsAny<CreateInterviewRequest>()))
+            .ThrowsAsync(new Exception("unexpected"));
+
+        Func<Task> act = async () => await _controller.CreateInterview(new CreateInterviewRequest());
+
+        await act.Should().ThrowAsync<Exception>();
+    }
+    [Test]
+    public void UpdateInterview_ShouldThrow_WhenIdNegative()
+    {
+        Action act = () => _controller
+            .UpdateInterview(-1, new UpdateInterviewRequest())
+            .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>();
+    }
+    [Test]
+    public void GetInterviewById_ShouldThrow_When_ServiceThrows()
+    {
+        _service.Setup(s => s.GetInterviewByIdAsync(1))
+            .ThrowsAsync(new ArgumentException("Id cannot be negative"));
+
+        Action act = () => _controller.GetInterviewById(1)
+            .GetAwaiter().GetResult();
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+
+
+
+
+
+
 }

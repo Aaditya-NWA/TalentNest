@@ -1,5 +1,8 @@
-﻿namespace RequirementService.DTOs.Responses;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace RequirementService.DTOs.Responses;
+
+[ExcludeFromCodeCoverage]
 public class RequirementResponse
 {
     public int Id { get; set; }
@@ -11,4 +14,6 @@ public class RequirementResponse
     public DateTime AvailabilityEnd { get; set; }
     public bool ClientInterviewRequired { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string RequiredPrimarySkillLevel { get; set; } = string.Empty;
+
 }
