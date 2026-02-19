@@ -156,19 +156,21 @@ namespace RequirementService.Controllers
         [HttpGet("{id}/match")]
         public async Task<IActionResult> MatchCandidates(int id)
         {
-            if (id < 0)
-                throw new ArgumentException("Id cannot be negative");
+            if (id <= 0)
+                return BadRequest("Id cannot be negative or zero");
 
             try
             {
-                var matches = await _matchingService.MatchCandidatesAsync(id);
+                var matches = await _matchingService.GetRankedMatchesAsync(id);
                 return Ok(matches);
             }
-            catch (Exception ex)
+            catch (KeyNotFoundException ex)
             {
                 return NotFound(ex.Message);
             }
+
         }
+
 
 
     }

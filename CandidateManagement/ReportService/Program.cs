@@ -1,32 +1,57 @@
 using ReportService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
 builder.AddServiceDefaults();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-/* ?? Declare config value FIRST (top-level scope) */
+/* ----------------------------------------
+   SERVICE URL CONFIGURATION
+---------------------------------------- */
+
 var interviewServiceUrl =
     builder.Configuration["Services:InterviewService"]
     ?? "https://localhost:7200";
 
-/* ?? Register Interview client ONCE */
+var candidateServiceUrl =
+    builder.Configuration["Services:CandidateService"]
+    ?? "https://localhost:7199";
+
+var requirementServiceUrl =
+    builder.Configuration["Services:RequirementService"]
+    ?? "https://localhost:7175";
+
+/* ----------------------------------------
+   HTTP CLIENT REGISTRATIONS
+---------------------------------------- */
+
 builder.Services.AddHttpClient<IInterviewClient, InterviewClient>(client =>
 {
     client.BaseAddress = new Uri(interviewServiceUrl);
 });
 
-/* ?? Other clients */
 builder.Services.AddHttpClient<CandidateClient>(client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7199");
+    client.BaseAddress = new Uri(candidateServiceUrl);
 });
 
 builder.Services.AddHttpClient<RequirementClient>(client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7175");
+    client.BaseAddress = new Uri(requirementServiceUrl);
 });
+
+/* ----------------------------------------
+   REPORT MANAGER REGISTRATION  ✅ FIX
+---------------------------------------- */
+
+builder.Services.AddScoped<IReportManager, ReportManager>();
+
+/* ----------------------------------------
+   BUILD APP
+---------------------------------------- */
 
 var app = builder.Build();
 
@@ -37,7 +62,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
 app.MapControllers();
 app.MapDefaultEndpoints();
+
 app.MapGet("/", () => Results.Redirect("/swagger"));
+
 app.Run();

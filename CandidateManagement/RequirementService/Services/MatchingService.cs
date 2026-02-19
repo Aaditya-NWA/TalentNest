@@ -89,4 +89,104 @@ public class MatchingService : IMatchingService
                availabilityMatch &&
                proficiencyMatch;
     }
+    public async Task<List<RankedCandidateDto>> GetRankedMatchesAsync(int requirementId)
+    {
+        if (requirementId <= 0)
+            throw new ArgumentException("Id cannot be negative");
+
+        var requirement = await _context.Requirements
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == requirementId);
+
+        if (requirement == null)
+            throw new KeyNotFoundException("Requirement not found");
+
+        var requiredSkills = requirement.SkillsNeeded
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim().ToLower())
+            .ToList();
+
+        var candidates = await _candidateClient.GetAllCandidatesAsync();
+
+        var ranked = new List<RankedCandidateDto>();
+
+        foreach (var candidate in candidates)
+        {
+            // 1️⃣ Hard Filtering
+
+            if (candidate.ExperienceMonths < requirement.MinExperienceMonths)
+                continue;
+
+            if (candidate.AvailabilityDate > requirement.AvailabilityStart)
+                continue;
+
+            int candidateLevel = ParseLevel(candidate.PrimarySkillLevel);
+            int requiredLevel = ParseLevel(requirement.RequiredPrimarySkillLevel);
+
+            if (candidateLevel < requiredLevel)
+                continue;
+
+            var candidateSkills = candidate.SkillSet
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim().ToLower())
+                .ToList();
+
+            var matchedSkills = requiredSkills
+                .Count(rs => candidateSkills.Contains(rs));
+
+            if (matchedSkills == 0)
+                continue;
+
+            // 2️⃣ Weighted Scoring
+
+            double skillScore =
+                ((double)matchedSkills / requiredSkills.Count) * 50;
+
+            double experienceScore = CalculateExperienceScore(
+                candidate.ExperienceMonths,
+                requirement.MinExperienceMonths);
+
+            double availabilityScore = 15;
+
+            double proficiencyScore = 10;
+
+            double totalScore =
+                skillScore +
+                experienceScore +
+                availabilityScore +
+                proficiencyScore;
+
+            ranked.Add(new RankedCandidateDto
+            {
+                CandidateId = candidate.Id,
+                Score = Math.Round(totalScore, 2),
+                MatchedSkills = matchedSkills,
+                TotalRequiredSkills = requiredSkills.Count,
+                ExperienceMonths = candidate.ExperienceMonths
+            });
+        }
+
+        return ranked
+            .OrderByDescending(r => r.Score)
+            .ToList();
+    }
+
+    private int ParseLevel(string level)
+    {
+        if (string.IsNullOrWhiteSpace(level) || level.Length < 2)
+            return 0;
+
+        return int.TryParse(level.Substring(1), out int result)
+            ? result
+            : 0;
+    }
+
+    private double CalculateExperienceScore(int candidateExp, int minExp)
+    {
+        if (candidateExp <= minExp)
+            return 12.5; // midpoint score
+
+        return 25; // full score for higher experience
+    }
+
 }

@@ -30,4 +30,18 @@ public class InterviewClient : IInterviewClient
             return [];
         }
     }
+    public async Task<List<InterviewDto>> GetAllAsync()
+    {
+        try
+        {
+            return await _http
+                .GetFromJsonAsync<List<InterviewDto>>("/api/interviews")
+                ?? new List<InterviewDto>();
+        }
+        catch
+        {
+            return new List<InterviewDto>();
+        }
+    }
+
 }

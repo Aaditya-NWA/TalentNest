@@ -89,20 +89,20 @@ public class RequirementsControllerTests
     [Test]
     public async Task MatchCandidates_ShouldReturnNotFound_WhenExceptionThrown()
     {
-        var context = CreateDbContext();
-
         var mockMatching = new Mock<IMatchingService>();
-        mockMatching.Setup(m => m.MatchCandidatesAsync(1))
-            .ThrowsAsync(new Exception("Requirement not found"));
+        mockMatching.Setup(m => m.GetRankedMatchesAsync(1))
+            .ThrowsAsync(new KeyNotFoundException("Requirement not found"));
 
-        var mockRequirementService = new Mock<IRequirementService>();
-
-        var controller = new RequirementsController(context, mockMatching.Object, mockRequirementService.Object);
+        var controller = new RequirementsController(
+            CreateDbContext(),
+            mockMatching.Object,
+            Mock.Of<IRequirementService>());
 
         var result = await controller.MatchCandidates(1);
 
         result.Should().BeOfType<NotFoundObjectResult>();
     }
+
     [Test]
     public async Task Create_ShouldReturnCreated_WhenValid()
     {
@@ -723,8 +723,8 @@ public class RequirementsControllerTests
     public async Task Match_ShouldReturnNotFound_WhenExceptionThrown()
     {
         var mockMatch = new Mock<IMatchingService>();
-        mockMatch.Setup(x => x.MatchCandidatesAsync(1))
-            .ThrowsAsync(new Exception("Requirement not found"));
+        mockMatch.Setup(x => x.GetRankedMatchesAsync(1))
+            .ThrowsAsync(new KeyNotFoundException("Requirement not found"));
 
         var controller = new RequirementsController(
             CreateDbContext(),
@@ -735,6 +735,7 @@ public class RequirementsControllerTests
 
         result.Should().BeOfType<NotFoundObjectResult>();
     }
+
     [Test]
     public void Delete_ShouldThrow_WhenIdNegative()
     {
@@ -749,18 +750,21 @@ public class RequirementsControllerTests
             .WithMessage("Id cannot be negative");
     }
     [Test]
-    public void MatchCandidates_ShouldThrow_WhenIdNegative()
+    public async Task MatchCandidates_ShouldReturnBadRequest_WhenIdNegative()
     {
         var controller = new RequirementsController(
             CreateDbContext(),
             Mock.Of<IMatchingService>(),
             Mock.Of<IRequirementService>());
 
-        Action act = () => controller.MatchCandidates(-1).GetAwaiter().GetResult();
+        var result = await controller.MatchCandidates(-1);
 
-        act.Should().Throw<ArgumentException>()
-            .WithMessage("Id cannot be negative");
+        result.Should().BeOfType<BadRequestObjectResult>();
+
+        var badRequest = result as BadRequestObjectResult;
+        badRequest!.Value.Should().Be("Id cannot be negative or zero");
     }
+
     [Test]
     public async Task Create_ShouldReturnBadRequest_WhenMinGreaterThanOrEqualMax()
     {

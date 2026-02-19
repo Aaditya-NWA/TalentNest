@@ -8,47 +8,50 @@ namespace ReportService.Controllers;
 [Route("internal/api/reports")]
 public class ReportsController : ControllerBase
 {
-    private readonly CandidateClient _candidates;
-    private readonly IInterviewClient _interviews;
-    private readonly RequirementClient _requirements;
+    private readonly IReportManager _reportManager;
 
-    public ReportsController(
-        CandidateClient candidates,
-        IInterviewClient interviews,
-        RequirementClient requirements)
+
+    public ReportsController(IReportManager reportManager)
     {
-        _candidates = candidates;
-        _interviews = interviews;
-        _requirements = requirements;
+        _reportManager = reportManager;
     }
 
     [HttpGet("summary")]
     public async Task<IActionResult> GetSummary()
     {
-        var candidates = await _candidates.GetAllAsync();
-        var requirements = await _requirements.GetAllAsync();
-
-        var interviewTasks = candidates
-            .Select(c => _interviews.GetByCandidateAsync(c.Id))
-            .ToList();
-
-        var interviewResults = await Task.WhenAll(interviewTasks);
-
-        var allInterviews = interviewResults
-            .SelectMany(i => i)
-            .ToList();
-
-        var report = new ReportSummaryResponse
-        {
-            TotalCandidates = candidates.Count,
-            TotalInterviews = allInterviews.Count,
-            ScheduledInterviews =
-                allInterviews.Count(i => i.Status == "Scheduled"),
-            OpenRequirements =
-                requirements.Count(r => r.Status == "Open")
-        };
-
-        return Ok(report);
+        var result = await _reportManager.GetSystemSummaryAsync();
+        return Ok(result);
     }
+    [HttpGet("candidate")]
+    public async Task<IActionResult> GetCandidateReport()
+    {
+        var result = await _reportManager.GetCandidateReportAsync();
+        return Ok(result);
+    }
+    [HttpGet("interview-validation")]
+    public async Task<IActionResult> GetInterviewValidationReport()
+    {
+        var result = await _reportManager.GetInterviewValidationReportAsync();
+        return Ok(result);
+    }
+    [HttpGet("requirement-fulfillment")]
+    public async Task<IActionResult> GetRequirementFulfillmentReport()
+    {
+        var result = await _reportManager.GetRequirementFulfillmentReportAsync();
+        return Ok(result);
+    }
+    [HttpGet("outcomes")]
+    public async Task<IActionResult> GetOutcomeReport()
+    {
+        var result = await _reportManager.GetOutcomeReportAsync();
+        return Ok(result);
+    }
+    [HttpGet("performance")]
+    public async Task<IActionResult> RunPerformanceTest([FromQuery] int requestCount = 20)
+    {
+        var result = await _reportManager.RunPerformanceTestAsync(requestCount);
+        return Ok(result);
+    }
+
 
 }

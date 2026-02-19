@@ -12,14 +12,15 @@ public class CandidateClient
     {
         try
         {
-            return await _http
-                .GetFromJsonAsync<List<CandidateDto>>("/api/candidates")
-                ?? [];
+            var response = await _http
+                .GetFromJsonAsync<CandidateListResponse>("/api/candidates");
+
+            return response?.Data ?? new List<CandidateDto>();
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException)
         {
-            // log if you want
-            return [];
+            return new List<CandidateDto>();
         }
     }
+
 }
