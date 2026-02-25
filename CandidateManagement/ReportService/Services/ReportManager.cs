@@ -1,4 +1,5 @@
 ﻿using ReportService.DTOs;
+using System.Diagnostics;
 
 namespace ReportService.Services;
 
@@ -8,10 +9,11 @@ public class ReportManager : IReportManager
     private readonly IInterviewClient _interviews;
     private readonly RequirementClient _requirements;
 
+
     public ReportManager(
-        CandidateClient candidates,
-        IInterviewClient interviews,
-        RequirementClient requirements)
+      CandidateClient candidates,
+      IInterviewClient interviews,
+      RequirementClient requirements)
     {
         _candidates = candidates;
         _interviews = interviews;
@@ -246,29 +248,35 @@ public class ReportManager : IReportManager
             OutcomeBreakdown = breakdown
         };
     }
+
     public async Task<PerformanceReportResponse> RunPerformanceTestAsync(int requestCount)
     {
         if (requestCount <= 0)
             throw new ArgumentException("Request count must be positive.");
 
+        var requirements = await _requirements.GetAllAsync();
+
+        if (!requirements.Any())
+            throw new InvalidOperationException("No requirements available for performance test.");
+
+        var requirementId = requirements.First().Id;
+            
         var latencies = new List<double>();
 
-        var tasks = Enumerable.Range(0, requestCount)
-            .Select(async _ =>
-            {
-                var sw = System.Diagnostics.Stopwatch.StartNew();
+        // Warm-up call
+        await _requirements.MatchAsync(requirementId);
 
-                await GetSystemSummaryAsync();
 
-                sw.Stop();
+        for (int i = 0; i < requestCount; i++)
+        {
+            var sw = Stopwatch.StartNew();
 
-                lock (latencies)
-                {
-                    latencies.Add(sw.Elapsed.TotalMilliseconds);
-                }
-            });
+            await _requirements.MatchAsync(requirementId);
 
-        await Task.WhenAll(tasks);
+            sw.Stop();
+
+            latencies.Add(sw.Elapsed.TotalMilliseconds);
+        }
 
         latencies.Sort();
 
@@ -276,8 +284,8 @@ public class ReportManager : IReportManager
         var min = latencies.First();
         var max = latencies.Last();
 
-        var p95Index = (int)(0.95 * latencies.Count) - 1;
-        if (p95Index < 0) p95Index = 0;
+        var p95Index = (int)Math.Ceiling(0.95 * latencies.Count) - 1;
+        p95Index = Math.Clamp(p95Index, 0, latencies.Count - 1);
 
         var p95 = latencies[p95Index];
 
@@ -290,5 +298,8 @@ public class ReportManager : IReportManager
             P95LatencyMs = Math.Round(p95, 2)
         };
     }
-
 }
+
+
+
+

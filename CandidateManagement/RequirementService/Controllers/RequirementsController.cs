@@ -27,11 +27,6 @@ namespace RequirementService.Controllers
 
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
-        {
-            return Ok(await _context.Requirements.ToListAsync());
-        }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -44,6 +39,18 @@ namespace RequirementService.Controllers
                 return NotFound();
 
             return Ok(requirement);
+        }
+        [HttpGet]
+        public async Task<IActionResult> GetAll(int page = 1, int pageSize = 50)
+        {
+            var result = await _context.Requirements
+                .AsNoTracking()
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Ok(result);
         }
 
 
@@ -170,8 +177,5 @@ namespace RequirementService.Controllers
             }
 
         }
-
-
-
     }
 }

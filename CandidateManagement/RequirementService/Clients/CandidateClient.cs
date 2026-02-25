@@ -41,4 +41,40 @@ public class CandidateClient : ICandidateClient
 
         return allCandidates;
     }
+    public async Task<PaginatedCandidateResponse> SearchCandidatesAsync(
+    int minExp,
+    int maxExp,
+    string? skill,
+    DateTime? start,
+    DateTime? end,
+    string? primarySkillLevel,
+    int page,
+    int pageSize)
+    {
+        var url =
+            $"api/candidates/search?" +
+            $"minExp={minExp}" +
+            $"&maxExp={maxExp}" +
+            $"&skill={Uri.EscapeDataString(skill ?? "")}" +
+            $"&start={(start.HasValue ? start.Value.ToString("O") : "")}" +
+            $"&end={(end.HasValue ? end.Value.ToString("O") : "")}" +
+            $"&primarySkillLevel={primarySkillLevel}" +
+            $"&page={page}" +
+            $"&pageSize={pageSize}";
+
+        var response = await _httpClient.GetAsync(url);
+
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content
+            .ReadFromJsonAsync<PaginatedCandidateResponse>(
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+        return result ?? new PaginatedCandidateResponse();
+    }
+
 }
+

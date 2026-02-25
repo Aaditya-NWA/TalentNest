@@ -10,4 +10,7 @@ public class RankedCandidateDto
     public int MatchedSkills { get; set; }
     public int TotalRequiredSkills { get; set; }
     public int ExperienceMonths { get; set; }
+    public string PrimarySkillLevel { get; set; }
+    public DateTime AvailabilityDate { get; set; }
+    public string SkillSet { get; set; }
 }

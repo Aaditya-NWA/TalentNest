@@ -335,6 +335,89 @@ namespace CandidateService.Controllers
             return result;
         }
 
+        // PAGINATED SEARCH (10k+ Optimized)
+        [HttpGet("search")]
+        public async Task<IActionResult> Search(
+            [FromQuery] int? minExp,
+            [FromQuery] int? maxExp,
+            [FromQuery] string? skill,
+            [FromQuery] string? start,
+            [FromQuery] string? end,
+            [FromQuery] string? primarySkillLevel,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50)
+        {
+            int safeMinExp = minExp ?? 0;
+            int safeMaxExp = maxExp ?? int.MaxValue;
 
+            if (safeMinExp < 0 || safeMaxExp < 0)
+                return BadRequest("Experience cannot be negative");
+
+            if (safeMinExp > safeMaxExp)
+                return BadRequest("minExp cannot be greater than maxExp");
+
+            DateTime? parsedStart = null;
+            DateTime? parsedEnd = null;
+
+            if (!string.IsNullOrWhiteSpace(start) &&
+                DateTime.TryParse(start, out var s))
+                parsedStart = s;
+
+            if (!string.IsNullOrWhiteSpace(end) &&
+                DateTime.TryParse(end, out var e))
+                parsedEnd = e;
+
+            if (parsedStart.HasValue && parsedEnd.HasValue &&
+                parsedStart > parsedEnd)
+                return BadRequest("Start date cannot be greater than End date");
+
+            if (page <= 0) page = 1;
+            if (pageSize <= 0 || pageSize > 200) pageSize = 50;
+
+            var query = _context.Candidates
+                .AsNoTracking()
+                .AsQueryable();
+
+            query = query.Where(c =>
+                c.ExperienceMonths >= safeMinExp &&
+                c.ExperienceMonths <= safeMaxExp);
+
+            if (!string.IsNullOrWhiteSpace(skill))
+            {
+                query = query.Where(c =>
+                    EF.Functions.Like(c.SkillSet, $"%{skill}%"));
+            }
+
+            if (parsedStart.HasValue && parsedEnd.HasValue)
+            {
+                query = query.Where(c =>
+                    c.AvailabilityDate >= parsedStart &&
+                    c.AvailabilityDate <= parsedEnd);
+            }
+
+            if (!string.IsNullOrWhiteSpace(primarySkillLevel))
+            {
+                query = query.Where(c =>
+                    c.PrimarySkillLevel == primarySkillLevel);
+            }
+
+            var totalCount = await query.CountAsync();
+
+            var result = await query
+                .OrderBy(c => c.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Ok(new
+            {
+                data = result,
+                page,
+                pageSize,
+                totalCount,
+                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            });
+        }
     }
+
 }
