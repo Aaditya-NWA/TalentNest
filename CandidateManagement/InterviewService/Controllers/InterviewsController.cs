@@ -4,6 +4,8 @@ using InterviewService.Contracts.Services;
 using InterviewService.DTOs.Requests.Interviews;
 using InterviewService.DTOs.Responses;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Diagnostics.CodeAnalysis;
 
 namespace InterviewService.Controllers;
 
@@ -69,7 +71,19 @@ public class InterviewsController : ControllerBase
 
         return Ok(interview);
     }
+    // Get Interview by CandidateID
+    [ExcludeFromCodeCoverage]
+    [HttpGet("candidate/{candidateId:int}")]
+    public async Task<IActionResult> GetByCandidate(int candidateId)
+    {
+        if (candidateId < 0)
+            return BadRequest("CandidateId cannot be negative.");
 
+        var interviews = await _interviewService
+            .GetInterviewsByCandidateAsync(candidateId);
+
+        return Ok(interviews);
+    }
     /// <summary>
     /// Get all interviews
     /// </summary>
@@ -124,4 +138,5 @@ public class InterviewsController : ControllerBase
 
         return NoContent();
     }
+
 }

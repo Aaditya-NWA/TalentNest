@@ -1,6 +1,7 @@
 ﻿using InterviewService.DTOs.Requests.Interviews;
 using InterviewService.DTOs.Responses;
 using InterviewService.Models.Enums;
+using System.Diagnostics.CodeAnalysis;
 
 namespace InterviewService.Contracts.Services;
 
@@ -19,4 +20,6 @@ public interface IInterviewService
 
     // ============ DELETE ============
     Task<bool> DeleteInterviewAsync(int id);
+    [ExcludeFromCodeCoverage]
+    Task<List<InterviewResponse>> GetInterviewsByCandidateAsync(int candidateId);
 }

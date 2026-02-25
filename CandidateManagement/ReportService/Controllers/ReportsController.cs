@@ -52,6 +52,20 @@ public class ReportsController : ControllerBase
         var result = await _reportManager.RunPerformanceTestAsync(requestCount);
         return Ok(result);
     }
+    [HttpGet("candidate/{id:int}")]
+    public async Task<IActionResult> GetCandidateDetailedReport(int id)
+    {
+        if (id < 0)
+            return BadRequest("Id cannot be negative");
+
+        var result = await _reportManager
+            .GetCandidateDetailedReportAsync(id);
+
+        if (result == null)
+            return NotFound();
+
+        return Ok(result);
+    }
 
 
 }

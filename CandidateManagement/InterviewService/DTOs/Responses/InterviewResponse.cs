@@ -16,5 +16,5 @@ public class InterviewResponse
     public int Level { get; set; }
     public InterviewOutcome FinalOutcome { get; set; }
     public DecisionMaker DecisionMaker { get; set; }
-    //public List<FeedbackResponse> Feedbacks { get; set; } = new();
+    public List<FeedbackResponse> Feedbacks { get; set; } = new();
 }

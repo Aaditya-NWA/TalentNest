@@ -4,6 +4,7 @@ using InterviewService.DTOs.Requests.Interviews;
 using InterviewService.DTOs.Responses;
 using InterviewService.Models;
 using InterviewService.Models.Enums;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics.CodeAnalysis;
 
 namespace InterviewService.Services;
@@ -138,7 +139,8 @@ public class InterviewService : IInterviewService
             Level = (int)interview.Level,
             FinalOutcome = interview.FinalOutcome,
             //FinalOutcomeName = interview.FinalOutcome.ToString(),
-            DecisionMaker = interview.DecisionMaker
+            DecisionMaker = interview.DecisionMaker,
+            Feedbacks = feedbacks
         };
     }
 
@@ -167,5 +169,19 @@ public class InterviewService : IInterviewService
             DecisionMaker = interview.DecisionMaker
             //Feedbacks = feedbacks
         };
+    }
+    [ExcludeFromCodeCoverage]
+    public async Task<List<InterviewResponse>>
+    GetInterviewsByCandidateAsync(int candidateId)
+    {
+        if (candidateId < 0)
+            throw new ArgumentException("CandidateId cannot be negative");
+
+        var interviews = await _interviewRepository.GetAllAsync();
+
+        return interviews
+            .Where(i => i.CandidateId == candidateId)
+            .Select(MapToResponse)
+            .ToList();
     }
 }

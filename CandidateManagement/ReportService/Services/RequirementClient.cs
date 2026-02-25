@@ -14,20 +14,15 @@ public class RequirementClient
 
     public async Task<List<RequirementDto>> GetAllAsync()
     {
-        try
-        {
-            return await _http
-                .GetFromJsonAsync<List<RequirementDto>>("/api/requirements")
-                ?? new List<RequirementDto>();
-        }
-        catch
-        {
-            return new List<RequirementDto>();
-        }
+        var response = await _http.GetAsync("/api/requirements");
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content
+            .ReadFromJsonAsync<List<RequirementDto>>() ?? new();
     }
 
     public async Task MatchAsync(int id)
     {
-        await _http.GetAsync($"/api/requirements/{id}/match");
+        await _http.GetAsync($"/api/performance/p95/{id}");
     }
 }

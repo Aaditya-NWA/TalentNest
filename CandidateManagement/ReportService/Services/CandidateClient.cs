@@ -1,5 +1,5 @@
-﻿using System.Net.Http.Json;
-using ReportService.DTOs;
+﻿using ReportService.DTOs;
+using System.Net.Http.Json;
 
 namespace ReportService.Services;
 
@@ -12,30 +12,48 @@ public class CandidateClient
         _http = http;
     }
 
+    private const int BatchSize = 1000;
+
     public async Task<List<CandidateDto>> GetAllAsync()
     {
-        var allCandidates = new List<CandidateDto>();
+        var results = new List<CandidateDto>();
 
         int page = 1;
-        int pageSize = 500; // Efficient batch size
-        int totalPages;
 
-        do
+        while (true)
         {
-            var response = await _http.GetFromJsonAsync<CandidateListResponse>(
-                $"/api/candidates?page={page}&pageSize={pageSize}"
-            );
+            var response =
+                await _http.GetFromJsonAsync<CandidateListResponse>(
+                    $"/api/candidates?page={page}&pageSize={BatchSize}");
 
-            if (response == null || response.Data == null)
+            if (response?.Data == null || response.Data.Count == 0)
                 break;
 
-            allCandidates.AddRange(response.Data);
+            results.AddRange(response.Data);
 
-            totalPages = response.TotalPages;
+            if (page >= response.TotalPages)
+                break;
+
             page++;
+        }
 
-        } while (page <= totalPages);
-
-        return allCandidates;
+        return results;
     }
+
+    public async Task<CandidateDto?> GetByIdAsync(int id)
+    {
+        return await _http.GetFromJsonAsync<CandidateDto>(
+            $"/api/candidates/{id}");
+    }
+
+
+    public async Task<int> GetTotalCountAsync()
+    {
+        var response =
+            await _http.GetFromJsonAsync<CandidateListResponse>(
+                "/api/candidates?page=1&pageSize=1");
+
+        return response?.TotalCount ?? 0;
+    }
+
 }

@@ -9,4 +9,7 @@ public interface IReportManager
     Task<OutcomeReportResponse> GetOutcomeReportAsync();
     Task<PerformanceReportResponse> RunPerformanceTestAsync(int requestCount);
 
+    // NEW
+    Task<CandidateDetailedReportResponse?> GetCandidateDetailedReportAsync(int candidateId);
+    
 }

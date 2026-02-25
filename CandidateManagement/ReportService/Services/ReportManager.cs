@@ -9,126 +9,140 @@ public class ReportManager : IReportManager
     private readonly IInterviewClient _interviews;
     private readonly RequirementClient _requirements;
 
-
     public ReportManager(
-      CandidateClient candidates,
-      IInterviewClient interviews,
-      RequirementClient requirements)
+        CandidateClient candidates,
+        IInterviewClient interviews,
+        RequirementClient requirements)
     {
         _candidates = candidates;
         _interviews = interviews;
         _requirements = requirements;
     }
 
-    // ----------------------------------------------------
-    // SUMMARY REPORT
-    // ----------------------------------------------------
     public async Task<ReportSummaryResponse> GetSystemSummaryAsync()
     {
-        var candidates = await _candidates.GetAllAsync();
-        var requirements = await _requirements.GetAllAsync();
+        var candidatesTask = _candidates.GetAllAsync();
+        var interviewsTask = _interviews.GetAllAsync();
+        var requirementsTask = _requirements.GetAllAsync();
 
-        var allInterviews = await _interviews.GetAllAsync();
+        await Task.WhenAll(
+            candidatesTask,
+            interviewsTask,
+            requirementsTask);
 
+        var candidates = candidatesTask.Result;
+        var interviews = interviewsTask.Result;
+        var requirements = requirementsTask.Result;
 
         return new ReportSummaryResponse
         {
             TotalCandidates = candidates.Count,
-            TotalInterviews = allInterviews.Count,
+            TotalInterviews = interviews.Count,
             ScheduledInterviews =
-                allInterviews.Count(i => i.Status == "Scheduled"),
+                interviews.Count(i =>
+                    string.IsNullOrWhiteSpace(i.FinalOutcome)),
             OpenRequirements =
-                requirements.Count(r => r.Status == "Open")
+                requirements.Count(r =>
+                    r.Status == "Open")
         };
     }
 
-    // ----------------------------------------------------
-    // CANDIDATE REPORT
-    // ----------------------------------------------------
     public async Task<CandidateReportResponse> GetCandidateReportAsync()
     {
-        var candidates = await _candidates.GetAllAsync();
+        var candidatesTask = _candidates.GetAllAsync();
+        var interviewsTask = _interviews.GetAllAsync();
 
-        var allInterviews = await _interviews.GetAllAsync();
+        await Task.WhenAll(
+            candidatesTask,
+            interviewsTask);
 
+        var candidates = candidatesTask.Result;
+        var interviews = interviewsTask.Result;
 
         var sixMonthsAgo = DateTime.UtcNow.AddMonths(-6);
 
-        var blockedCandidates = allInterviews
+        var blocked =
+            interviews
             .Where(i => i.InterviewDate >= sixMonthsAgo)
             .Select(i => i.CandidateId)
             .Distinct()
             .ToList();
 
-        // Skills distribution (split comma-separated skills)
-        var skillsDistribution = candidates
+        var skills =
+            candidates
             .SelectMany(c =>
                 (c.SkillSet ?? "")
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim()))
-            .GroupBy(skill => skill)
-            .ToDictionary(g => g.Key, g => g.Count());
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim()))
+            .GroupBy(x => x)
+            .ToDictionary(x => x.Key, x => x.Count());
 
-        // Proficiency distribution (PrimarySkillLevel)
-        var proficiencyDistribution = candidates
-            .GroupBy(c => string.IsNullOrWhiteSpace(c.PrimarySkillLevel)
+        var proficiency =
+            candidates
+            .GroupBy(x =>
+                string.IsNullOrWhiteSpace(x.PrimarySkillLevel)
                 ? "Unknown"
-                : c.PrimarySkillLevel)
-            .ToDictionary(g => g.Key, g => g.Count());
+                : x.PrimarySkillLevel)
+            .ToDictionary(x => x.Key, x => x.Count());
 
-        // Availability logic (available if availabilityDate <= today)
-        var availableCount = candidates
-            .Count(c => c.AvailabilityDate <= DateTime.UtcNow);
+        var available =
+            candidates.Count(x =>
+                x.AvailabilityDate <= DateTime.UtcNow);
 
-        var availabilityPercentage =
+        var percent =
             candidates.Count == 0
                 ? 0
-                : (double)availableCount / candidates.Count * 100;
+                : (double)available /
+                  candidates.Count * 100;
 
         return new CandidateReportResponse
         {
             TotalCandidates = candidates.Count,
-            SkillsDistribution = skillsDistribution,
-            ProficiencyDistribution = proficiencyDistribution,
-            AvailableCandidates = availableCount,
-            AvailabilityPercentage = Math.Round(availabilityPercentage, 2),
-            BlockedCandidatesLast6Months = blockedCandidates
+            SkillsDistribution = skills,
+            ProficiencyDistribution = proficiency,
+            AvailableCandidates = available,
+            AvailabilityPercentage = Math.Round(percent, 2),
+            BlockedCandidatesLast6Months = blocked
         };
     }
 
-    // ----------------------------------------------------
-    // INTERVIEW VALIDATION REPORT (6-Month Rule)
-    // ----------------------------------------------------
-    public async Task<InterviewValidationReportResponse> GetInterviewValidationReportAsync()
+    public async Task<InterviewValidationReportResponse>
+        GetInterviewValidationReportAsync()
     {
-        var candidates = await _candidates.GetAllAsync();
+        var interviews =
+            await _interviews.GetAllAsync();
 
-        var allInterviews = await _interviews.GetAllAsync();
+        var sixMonthsAgo =
+            DateTime.UtcNow.AddMonths(-6);
 
-
-        var sixMonthsAgo = DateTime.UtcNow.AddMonths(-6);
-
-        var blocked = allInterviews
+        var blocked =
+            interviews
             .Where(i => i.InterviewDate >= sixMonthsAgo)
-            .GroupBy(i => new { i.CandidateId, i.Project })
+            .GroupBy(i =>
+                new { i.CandidateId, i.Project })
             .Select(g =>
             {
-                var latestInterview = g
-                    .OrderByDescending(x => x.InterviewDate)
+                var latest =
+                    g.OrderByDescending(x =>
+                        x.InterviewDate)
                     .First();
 
-                var eligibleDate = latestInterview.InterviewDate.AddMonths(6);
+                var eligible =
+                    latest.InterviewDate
+                    .AddMonths(6);
 
-                var daysRemaining =
-                    (eligibleDate - DateTime.UtcNow).Days;
+                var days =
+                    (eligible -
+                     DateTime.UtcNow).Days;
 
                 return new BlockedCandidateInfo
                 {
                     CandidateId = g.Key.CandidateId,
                     Project = g.Key.Project,
-                    LastInterviewDate = latestInterview.InterviewDate,
+                    LastInterviewDate =
+                        latest.InterviewDate,
                     DaysUntilEligible =
-                        daysRemaining > 0 ? daysRemaining : 0
+                        Math.Max(days, 0)
                 };
             })
             .ToList();
@@ -139,11 +153,8 @@ public class ReportManager : IReportManager
         };
     }
 
-    // ----------------------------------------------------
-    // REQUIREMENT FULFILLMENT REPORT
-    // ----------------------------------------------------
     public async Task<RequirementFulfillmentReportResponse>
-        GetRequirementFulfillmentReportAsync()
+      GetRequirementFulfillmentReportAsync()
     {
         var candidates = await _candidates.GetAllAsync();
         var requirements = await _requirements.GetAllAsync();
@@ -196,7 +207,7 @@ public class ReportManager : IReportManager
             var selectedCandidates = allInterviews
                 .Where(i =>
                     i.Project == requirement.Project &&
-                    i.Outcome == "Selected")
+                    i.FinalOutcome == "Selected")
                 .Select(i => i.CandidateId)
                 .Distinct()
                 .Count();
@@ -225,27 +236,29 @@ public class ReportManager : IReportManager
         };
     }
 
-    // ----------------------------------------------------
-    // OUTCOME REPORT
-    // ----------------------------------------------------
-    public async Task<OutcomeReportResponse> GetOutcomeReportAsync()
+    public async Task<OutcomeReportResponse>
+        GetOutcomeReportAsync()
     {
-        var candidates = await _candidates.GetAllAsync();
+        var interviews =
+            await _interviews.GetAllAsync();
 
-        var allInterviews = await _interviews.GetAllAsync();
-
-
-        var breakdown = allInterviews
+        var breakdown =
+            interviews
             .GroupBy(i =>
-                string.IsNullOrWhiteSpace(i.Outcome)
-                    ? "Unknown"
-                    : i.Outcome)
-            .ToDictionary(g => g.Key, g => g.Count());
+                string.IsNullOrWhiteSpace(
+                    i.FinalOutcome)
+                ? "Unknown"
+                : i.FinalOutcome)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Count());
 
         return new OutcomeReportResponse
         {
-            TotalInterviews = allInterviews.Count,
-            OutcomeBreakdown = breakdown
+            TotalInterviews =
+                interviews.Count,
+            OutcomeBreakdown =
+                breakdown
         };
     }
 
@@ -260,7 +273,7 @@ public class ReportManager : IReportManager
             throw new InvalidOperationException("No requirements available for performance test.");
 
         var requirementId = requirements.First().Id;
-            
+
         var latencies = new List<double>();
 
         // Warm-up call
@@ -298,8 +311,55 @@ public class ReportManager : IReportManager
             P95LatencyMs = Math.Round(p95, 2)
         };
     }
+
+    public async Task<CandidateDetailedReportResponse?>
+        GetCandidateDetailedReportAsync(int id)
+    {
+        var candidate =
+            await _candidates.GetByIdAsync(id);
+
+        if (candidate == null)
+            return null;
+
+        var interviews =
+            await _interviews
+            .GetByCandidateAsync(id);
+
+        var requirements =
+            await _requirements.GetAllAsync();
+
+        return new CandidateDetailedReportResponse
+        {
+            Candidate = candidate,
+            Interviews = interviews,
+            Requirements =
+                requirements
+                .Select(r =>
+                    new RequirementSummaryDto
+                    {
+                        RequirementId = r.Id,
+                        Project = r.Project,
+                        Matched =
+                            candidate.SkillSet
+                            .Contains(
+                                r.SkillsNeeded),
+                        Interviewed =
+                            interviews.Any(i =>
+                                i.Project ==
+                                r.Project),
+                        Selected =
+                            interviews.Any(i =>
+                                i.Project ==
+                                r.Project &&
+                                i.FinalOutcome ==
+                                "Selected")
+                    })
+                .ToList(),
+            BlockedBySixMonthRule =
+                interviews.Any(i =>
+                    i.InterviewDate >=
+                    DateTime.UtcNow
+                    .AddMonths(-6))
+        };
+    }
 }
-
-
-
-

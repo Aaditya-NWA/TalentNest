@@ -5,6 +5,16 @@ public record InterviewDto(
     int CandidateId,
     string Project,
     DateTime InterviewDate,
-    string Status,
-    string Outcome
+    int Level,
+    string FinalOutcome,
+    string DecisionMaker,
+    List<FeedbackDto> Feedbacks
+);
+
+public record FeedbackDto(
+    int Id,
+    int InterviewId,
+    string Comments,
+    string RecommendedOutcomeName,
+    string CreatedBy
 );

@@ -14,3 +14,4 @@ public class CandidateReportResponse
 
     public List<int> BlockedCandidatesLast6Months { get; set; } = new();
 }
+    

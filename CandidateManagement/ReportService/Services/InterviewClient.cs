@@ -8,7 +8,8 @@ public class InterviewClient : IInterviewClient
     private readonly HttpClient _http;
     private readonly ILogger<InterviewClient> _logger;
 
-    public InterviewClient(HttpClient http, ILogger<InterviewClient> logger)
+    public InterviewClient(HttpClient http,
+        ILogger<InterviewClient> logger)
     {
         _http = http;
         _logger = logger;
@@ -19,29 +20,33 @@ public class InterviewClient : IInterviewClient
         try
         {
             return await _http.GetFromJsonAsync<List<InterviewDto>>(
-                $"/api/interviews/candidate/{candidateId}"
-            ) ?? [];
+                $"/internal/api/interviews/candidate/{candidateId}"
+            ) ?? new();
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex)
         {
             _logger.LogError(ex,
                 "Failed to fetch interviews for candidate {CandidateId}",
                 candidateId);
-            return [];
+
+            return new();
         }
     }
+
     public async Task<List<InterviewDto>> GetAllAsync()
     {
         try
         {
-            return await _http
-                .GetFromJsonAsync<List<InterviewDto>>("/api/interviews")
-                ?? new List<InterviewDto>();
+            return await _http.GetFromJsonAsync<List<InterviewDto>>(
+                "/internal/api/interviews"
+            ) ?? new();
         }
-        catch
+        catch (Exception ex)
         {
-            return new List<InterviewDto>();
+            _logger.LogError(ex,
+                "Failed to fetch all interviews");
+
+            return new();
         }
     }
-
 }
