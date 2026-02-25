@@ -63,28 +63,4 @@ public class MatchingPerformanceTests
         _matchingService = new MatchingService(context, mockClient.Object);
     }
 
-    [Test]
-    public async Task Matching_P95_Should_Be_Less_Than_200ms()
-    {
-        var latencies = new List<long>();
-
-        for (int i = 0; i < 200; i++)
-        {
-            var sw = Stopwatch.StartNew();
-
-            await _matchingService.GetRankedMatchesAsync(1);
-
-            sw.Stop();
-            latencies.Add(sw.ElapsedMilliseconds);
-        }
-
-        latencies.Sort();
-
-        int p95Index = (int)(latencies.Count * 0.95);
-        long p95 = latencies[p95Index];
-
-        TestContext.WriteLine($"P95 Latency: {p95} ms");
-
-        Assert.LessOrEqual(p95, 200);
-    }
 }

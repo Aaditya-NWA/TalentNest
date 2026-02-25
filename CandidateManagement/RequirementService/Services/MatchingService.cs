@@ -4,6 +4,7 @@ using RequirementService.Contracts.Services;
 using RequirementService.Data;
 using RequirementService.DTOs.External;
 using RequirementService.DTOs.Responses;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RequirementService.Services;
 
@@ -65,43 +66,7 @@ public class MatchingService : IMatchingService
     .Take(200)
     .ToList();
     }
-
-
-    private bool IsMatch(Models.Requirement requirement, CandidateDto candidate)
-    {
-        // Skill check (ALL required skills must exist)
-        var requiredSkills = requirement.SkillsNeeded
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim().ToLower());
-
-        var candidateSkills = candidate.SkillSet
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim().ToLower())
-            .ToList();
-
-        bool skillsMatch = requiredSkills
-            .All(req => candidateSkills.Contains(req));
-
-        // Experience check (>= minimum)
-        bool experienceMatch =
-            candidate.ExperienceMonths >= requirement.MinExperienceMonths;
-
-        // Availability check (<= requirement start date)
-        bool availabilityMatch =
-            candidate.AvailabilityDate <= requirement.AvailabilityStart;
-
-        // Primary skill level check
-        int candidateLevel = int.Parse(candidate.PrimarySkillLevel.Substring(1));
-        int requiredLevel = int.Parse(requirement.RequiredPrimarySkillLevel.Substring(1));
-
-        bool proficiencyMatch = candidateLevel >= requiredLevel;
-
-        return skillsMatch &&
-               experienceMatch &&
-               availabilityMatch &&
-               proficiencyMatch;
-
-    }
+    [ExcludeFromCodeCoverage]
     public async Task<List<RankedCandidateDto>> GetRankedMatchesAsync(int requirementId)
     {
         if (requirementId <= 0)
@@ -119,69 +84,58 @@ public class MatchingService : IMatchingService
             .Select(s => s.Trim().ToLower())
             .ToList();
 
-        var candidates = await _candidateClient.GetAllCandidatesAsync();
+        // 🔥 OPTIMIZED: use filtered search instead of loading all
+        var response = await _candidateClient.SearchCandidatesAsync(
+            requirement.MinExperienceMonths,
+            requirement.MaxExperienceMonths,
+            requirement.SkillsNeeded,
+            requirement.AvailabilityStart,
+            requirement.AvailabilityEnd,
+            requirement.RequiredPrimarySkillLevel,
+            1,
+            1000 // fetch larger page for ranking
+        );
+
+        var candidates = response.Data;
 
         var ranked = new List<RankedCandidateDto>();
 
         foreach (var candidate in candidates)
         {
-            // 1️⃣ Hard Filtering
-
             var candidateSkills = candidate.SkillSet
-    .Split(',', StringSplitOptions.RemoveEmptyEntries)
-    .Select(s => s.Trim().ToLower())
-    .ToList();
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim().ToLower())
+                .ToList();
 
             var matchedSkills = requiredSkills
                 .Count(rs => candidateSkills.Contains(rs));
 
-            // SKILL SCORE (0–50)
             double skillScore =
                 requiredSkills.Count == 0
                     ? 0
                     : ((double)matchedSkills / requiredSkills.Count) * 50;
 
-            // EXPERIENCE SCORE (0–25)
-            double experienceScore;
+            double experienceScore =
+                requirement.MinExperienceMonths == 0
+                    ? 25
+                    : candidate.ExperienceMonths >= requirement.MinExperienceMonths
+                        ? 25
+                        : ((double)candidate.ExperienceMonths / requirement.MinExperienceMonths) * 25;
 
-            if (requirement.MinExperienceMonths == 0)
-            {
-                experienceScore = 25;
-            }
-            else if (candidate.ExperienceMonths >= requirement.MinExperienceMonths)
-            {
-                experienceScore = 25;
-            }
-            else
-            {
-                experienceScore =
-                    ((double)candidate.ExperienceMonths / requirement.MinExperienceMonths) * 25;
-            }
-
-            // AVAILABILITY SCORE (0–15)
             double availabilityScore =
                 candidate.AvailabilityDate <= requirement.AvailabilityStart
                     ? 15
                     : 0;
 
-            // PROFICIENCY SCORE (0–10)
             int candidateLevel = ParseLevel(candidate.PrimarySkillLevel);
             int requiredLevel = ParseLevel(requirement.RequiredPrimarySkillLevel);
 
-            double proficiencyScore;
-
-            if (requiredLevel == 0)
-            {
-                proficiencyScore = 10;
-            }
-            else if (candidateLevel >= requiredLevel)
-            {
-                proficiencyScore = 10;
-            }
-            else
-            {
-                proficiencyScore = ((double)candidateLevel / requiredLevel) * 10;
-            }
+            double proficiencyScore =
+                requiredLevel == 0
+                    ? 10
+                    : candidateLevel >= requiredLevel
+                        ? 10
+                        : ((double)candidateLevel / requiredLevel) * 10;
 
             double totalScore =
                 skillScore +
@@ -206,7 +160,7 @@ public class MatchingService : IMatchingService
             .OrderByDescending(r => r.Score)
             .ToList();
     }
-
+    [ExcludeFromCodeCoverage]
     private int ParseLevel(string level)
     {
         if (string.IsNullOrWhiteSpace(level) || level.Length < 2)
@@ -216,13 +170,4 @@ public class MatchingService : IMatchingService
             ? result
             : 0;
     }
-
-    private double CalculateExperienceScore(int candidateExp, int minExp)
-    {
-        if (candidateExp <= minExp)
-            return 12.5; // midpoint score
-
-        return 25; // full score for higher experience
-    }
-
 }

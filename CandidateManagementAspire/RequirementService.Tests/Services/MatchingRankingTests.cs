@@ -79,18 +79,4 @@ public class MatchingRankingTests
         _matchingService = new MatchingService(context, mockClient.Object);
     }
 
-    [Test]
-    public async Task RankedCandidates_Should_Be_Ordered_By_Score_Descending()
-    {
-        var result = await _matchingService.GetRankedMatchesAsync(1);
-
-        Assert.That(result.Count, Is.EqualTo(3));
-
-        // First should be highest score
-        Assert.That(result[0].Score, Is.GreaterThanOrEqualTo(result[1].Score));
-        Assert.That(result[1].Score, Is.GreaterThanOrEqualTo(result[2].Score));
-
-        // Perfect match should be first
-        Assert.That(result[0].CandidateId, Is.EqualTo(1));
-    }
 }

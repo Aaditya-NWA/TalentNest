@@ -512,14 +512,264 @@ public class CandidateControllerTests
         act.Should().Throw<ArgumentException>()
             .WithMessage("Id cannot be negative");
     }
+    [Test]
+    public async Task Search_ShouldReturnBadRequest_WhenExperienceNegative()
+    {
+        var controller = new CandidateController(
+            CreateDb(),
+            Mock.Of<ICandidateBulkInsertService>());
 
+        var result = await controller.Search(minExp: -1, maxExp: 10,
+            skill: null, start: null, end: null,
+            primarySkillLevel: null);
 
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldReturnBadRequest_WhenMinGreaterThanMax()
+    {
+        var controller = new CandidateController(
+            CreateDb(),
+            Mock.Of<ICandidateBulkInsertService>());
 
+        var result = await controller.Search(10, 5,
+            null, null, null, null);
 
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldReturnBadRequest_WhenStartGreaterThanEnd()
+    {
+        var controller = new CandidateController(
+            CreateDb(),
+            Mock.Of<ICandidateBulkInsertService>());
 
+        var result = await controller.Search(
+            0, 10,
+            null,
+            "2026-02-25",
+            "2025-02-25",
+            null);
 
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldReturnFilteredResults()
+    {
+        var db = CreateDb();
 
+        db.Candidates.Add(new Candidate
+        {
+            Name = "A",
+            MailId = "a@test.com",
+            SkillSet = "C#",
+            ExperienceMonths = 5,
+            AvailabilityDate = DateTime.Today,
+            PrimarySkillLevel = "P1"
+        });
 
+        db.SaveChanges();
 
+        var controller = new CandidateController(db, Mock.Of<ICandidateBulkInsertService>());
 
+        var result = await controller.Search(
+            1, 10,
+            "C#",
+            null,
+            null,
+            "P1");
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldNormalizePageAndPageSize()
+    {
+        var controller = new CandidateController(
+            CreateDb(),
+            Mock.Of<ICandidateBulkInsertService>());
+
+        var result = await controller.Search(
+            0, 10,
+            null,
+            null,
+            null,
+            null,
+            page: 0,
+            pageSize: 999);
+
+        var ok = result as OkObjectResult;
+        ok.Should().NotBeNull();
+
+        var value = ok!.Value!;
+        var pageProp = value.GetType().GetProperty("page");
+        var pageSizeProp = value.GetType().GetProperty("pageSize");
+
+        ((int)pageProp!.GetValue(value)!).Should().Be(1);
+        ((int)pageSizeProp!.GetValue(value)!).Should().Be(50);
+    }
+    [Test]
+    public async Task Search_ShouldFilter_BySkillOnly()
+    {
+        var db = CreateDb();
+
+        db.Candidates.Add(new Candidate
+        {
+            Name = "A",
+            MailId = "a@test.com",
+            SkillSet = "C#",
+            ExperienceMonths = 5,
+            AvailabilityDate = DateTime.Today,
+            PrimarySkillLevel = "P1"
+        });
+
+        db.SaveChanges();
+
+        var controller = new CandidateController(db, Mock.Of<ICandidateBulkInsertService>());
+
+        var result = await controller.Search(
+            0, 10,
+            "C#",
+            null,
+            null,
+            null);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldFilter_ByAvailabilityOnly()
+    {
+        var db = CreateDb();
+
+        db.Candidates.Add(new Candidate
+        {
+            Name = "A",
+            MailId = "a@test.com",
+            SkillSet = "C#",
+            ExperienceMonths = 5,
+            AvailabilityDate = DateTime.Today,
+            PrimarySkillLevel = "P1"
+        });
+
+        db.SaveChanges();
+
+        var controller = new CandidateController(db, Mock.Of<ICandidateBulkInsertService>());
+
+        var today = DateTime.Today.ToString("yyyy-MM-dd");
+
+        var result = await controller.Search(
+            0, 10,
+            null,
+            today,
+            today,
+            null);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldFilter_ByPrimarySkillLevelOnly()
+    {
+        var db = CreateDb();
+
+        db.Candidates.Add(new Candidate
+        {
+            Name = "A",
+            MailId = "a@test.com",
+            SkillSet = "C#",
+            ExperienceMonths = 5,
+            AvailabilityDate = DateTime.Today,
+            PrimarySkillLevel = "P1"
+        });
+
+        db.SaveChanges();
+
+        var controller = new CandidateController(db, Mock.Of<ICandidateBulkInsertService>());
+
+        var result = await controller.Search(
+            0, 10,
+            null,
+            null,
+            null,
+            "P1");
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldHandle_OnlyStartDateProvided()
+    {
+        var controller = new CandidateController(
+            CreateDb(),
+            Mock.Of<ICandidateBulkInsertService>());
+
+        var result = await controller.Search(
+            0, 10,
+            null,
+            DateTime.Today.ToString("yyyy-MM-dd"),
+            null,
+            null);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldHandle_OnlyEndDateProvided()
+    {
+        var controller = new CandidateController(
+            CreateDb(),
+            Mock.Of<ICandidateBulkInsertService>());
+
+        var result = await controller.Search(
+            0, 10,
+            null,
+            null,
+            DateTime.Today.ToString("yyyy-MM-dd"),
+            null);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+    [Test]
+    public async Task Search_ShouldHandle_InvalidDateStrings_Gracefully()
+    {
+        var controller = new CandidateController(
+            CreateDb(),
+            Mock.Of<ICandidateBulkInsertService>());
+
+        var result = await controller.Search(
+            0, 10,
+            null,
+            "invalid-date",
+            "also-invalid",
+            null);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+    [Test]
+    public async Task Search_DateRange_WithNoMatchingCandidates_ShouldReturnOk()
+    {
+        var db = CreateDb();
+
+        db.Candidates.Add(new Candidate
+        {
+            Name = "A",
+            MailId = "a@test.com",
+            SkillSet = "C#",
+            ExperienceMonths = 5,
+            AvailabilityDate = DateTime.Today.AddDays(-10),
+            PrimarySkillLevel = "P1"
+        });
+
+        db.SaveChanges();
+
+        var controller = new CandidateController(db, Mock.Of<ICandidateBulkInsertService>());
+
+        var start = DateTime.Today.ToString("yyyy-MM-dd");
+        var end = DateTime.Today.ToString("yyyy-MM-dd");
+
+        var result = await controller.Search(
+            0, 10,
+            null,
+            start,
+            end,
+            null);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
 }

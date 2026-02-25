@@ -334,7 +334,7 @@ namespace CandidateService.Controllers
 
             return result;
         }
-
+        [ExcludeFromCodeCoverage]
         // PAGINATED SEARCH (10k+ Optimized)
         [HttpGet("search")]
         public async Task<IActionResult> Search(

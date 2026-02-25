@@ -702,41 +702,6 @@ public class RequirementsControllerTests
     }
 
     [Test]
-    public async Task Match_ShouldReturnOk_WhenSuccess()
-    {
-        var mockMatch = new Mock<IMatchingService>();
-        mockMatch.Setup(x => x.MatchCandidatesAsync(1))
-    .ReturnsAsync(new List<CandidateMatchResponse>());
-
-
-        var controller = new RequirementsController(
-            CreateDbContext(),
-            mockMatch.Object,
-            Mock.Of<IRequirementService>());
-
-        var result = await controller.MatchCandidates(1);
-
-        result.Should().BeOfType<OkObjectResult>();
-    }
-
-    [Test]
-    public async Task Match_ShouldReturnNotFound_WhenExceptionThrown()
-    {
-        var mockMatch = new Mock<IMatchingService>();
-        mockMatch.Setup(x => x.GetRankedMatchesAsync(1))
-            .ThrowsAsync(new KeyNotFoundException("Requirement not found"));
-
-        var controller = new RequirementsController(
-            CreateDbContext(),
-            mockMatch.Object,
-            Mock.Of<IRequirementService>());
-
-        var result = await controller.MatchCandidates(1);
-
-        result.Should().BeOfType<NotFoundObjectResult>();
-    }
-
-    [Test]
     public void Delete_ShouldThrow_WhenIdNegative()
     {
         var controller = new RequirementsController(

@@ -2,590 +2,834 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using NUnit.Framework;
 using RequirementService.Contracts.Clients;
-using RequirementService.Contracts.Services;
 using RequirementService.Controllers;
 using RequirementService.Data;
 using RequirementService.DTOs.External;
 using RequirementService.Models;
 using RequirementService.Services;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace RequirementService.Tests.Services;
-
-[ExcludeFromCodeCoverage]
-public class MatchingServiceTests
+namespace RequirementService.Tests.Services
 {
-    private RequirementDbContext CreateDbContext()
+    [ExcludeFromCodeCoverage]
+    public class MatchingServiceTests
     {
-        var options = new DbContextOptionsBuilder<RequirementDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-
-        return new RequirementDbContext(options);
-    }
-
-    private Requirement CreateRequirement()
-    {
-        return new Requirement
+        private RequirementDbContext CreateDb()
         {
-            Id = 1,
-            Project = "Test",
-            SkillsNeeded = "C#,SQL",
-            MinExperienceMonths = 12,
-            MaxExperienceMonths = 60,
-            AvailabilityStart = new DateTime(2026, 2, 1),
-            AvailabilityEnd = new DateTime(2026, 6, 1),
-            RequiredPrimarySkillLevel = "P2",
-            ClientInterviewRequired = true,
-            CreatedAt = DateTime.UtcNow
-        };
-    }
+            var options = new DbContextOptionsBuilder<RequirementDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .Options;
 
-    private CandidateDto CreateMatchingCandidate()
-    {
-        return new CandidateDto
+            return new RequirementDbContext(options);
+        }
+
+        // ======================================================
+        // MATCHCANDIDATESASYNC
+        // ======================================================
+
+        [Test]
+        public void MatchCandidates_ShouldThrow_WhenIdNegative()
         {
-            Id = 10,
-            Name = "Match",
-            SkillSet = "C#,SQL,React",
-            ExperienceMonths = 24,
-            AvailabilityDate = new DateTime(2026, 1, 1),
-            PrimarySkillLevel = "P3"
-        };
-    }
-    [Test]
-    public async Task MatchCandidatesAsync_ShouldThrow_WhenRequirementNotFound()
-    {
-        var context = CreateDbContext();
+            var service = new MatchingService(
+                CreateDb(),
+                Mock.Of<ICandidateClient>());
 
-        var mockClient = new Mock<ICandidateClient>();
+            Action act = () => service.MatchCandidatesAsync(-1).GetAwaiter().GetResult();
 
-        var service = new MatchingService(context, mockClient.Object);
+            act.Should().Throw<ArgumentException>();
+        }
 
-        Func<Task> act = async () => await service.MatchCandidatesAsync(999);
+        [Test]
+        public void MatchCandidates_ShouldThrow_WhenRequirementNotFound()
+        {
+            var service = new MatchingService(
+                CreateDb(),
+                Mock.Of<ICandidateClient>());
 
-        await act.Should().ThrowAsync<Exception>()
-            .WithMessage("Requirement not found");
-    }
-    [Test]
-    public async Task MatchCandidatesAsync_ShouldReturnMatchingCandidate()
-    {
-        var context = CreateDbContext();
+            Action act = () => service.MatchCandidatesAsync(1).GetAwaiter().GetResult();
 
-        var requirement = CreateRequirement();
-        context.Requirements.Add(requirement);
-        await context.SaveChangesAsync();
+            act.Should().Throw<Exception>()
+                .WithMessage("Requirement not found");
+        }
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(c => c.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
+        [Test]
+        public async Task MatchCandidates_ShouldReturnMappedCandidates()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
             {
-            CreateMatchingCandidate()
+                Id = 1,
+                SkillsNeeded = "C#",
+                MinExperienceMonths = 1,
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(10),
+                RequiredPrimarySkillLevel = "P1"
             });
 
-        var service = new MatchingService(context, mockClient.Object);
+            db.SaveChanges();
 
-        var result = await service.MatchCandidatesAsync(1);
+            var mockClient = new Mock<ICandidateClient>();
 
-        result.Should().HaveCount(1);
-        result.First().Name.Should().Be("Match");
-    }
-    [Test]
-    public async Task MatchCandidatesAsync_ShouldExclude_WhenSkillsDoNotMatch()
-    {
-        var context = CreateDbContext();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    1, 10, "C#",
+                    null,
+                    It.IsAny<DateTime?>(),
+                    "P1",
+                    1,
+                    200))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                        new CandidateDto
+                        {
+                            Id = 10,
+                            Name = "Test",
+                            SkillSet = "C#",
+                            ExperienceMonths = 5,
+                            AvailabilityDate = DateTime.UtcNow,
+                            PrimarySkillLevel = "P2"
+                        }
+                    }
+                });
 
-        var requirement = CreateRequirement();
-        context.Requirements.Add(requirement);
-        await context.SaveChangesAsync();
+            var service = new MatchingService(db, mockClient.Object);
 
-        var candidate = CreateMatchingCandidate();
-        candidate.SkillSet = "Java,React";
+            var result = await service.MatchCandidatesAsync(1);
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(c => c.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto> { candidate });
+            result.Should().HaveCount(1);
+            result.First().CandidateId.Should().Be(10);
+        }
 
-        var service = new MatchingService(context, mockClient.Object);
+        // ======================================================
+        // GETRANKEDMATCHESASYNC
+        // ======================================================
 
-        var result = await service.MatchCandidatesAsync(1);
-
-        result.Should().BeEmpty();
-    }
-
-    [Test]
-    public void MatchCandidates_ShouldThrow_WhenIdNegative()
-    {
-        var context = CreateDbContext();
-        var mockClient = new Mock<ICandidateClient>();
-        var service = new MatchingService(context, mockClient.Object);
-
-        Func<Task> act = async () => await service.MatchCandidatesAsync(-1);
-
-        act.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("Id cannot be negative");
-    }
-
-    [Test]
-    public void MatchCandidates_ShouldThrow_WhenRequirementMissing()
-    {
-        var context = CreateDbContext();
-        var mockClient = new Mock<ICandidateClient>();
-        var service = new MatchingService(context, mockClient.Object);
-
-        Func<Task> act = async () => await service.MatchCandidatesAsync(999);
-
-        act.Should().ThrowAsync<Exception>()
-            .WithMessage("Requirement not found");
-    }
-
-    [Test]
-    public async Task MatchCandidates_ShouldReturnMatch_WhenValid()
-    {
-        var context = CreateDbContext();
-
-        context.Requirements.Add(new Requirement
+        [Test]
+        public void GetRankedMatches_ShouldThrow_WhenIdInvalid()
         {
-            Id = 1,
-            Project = "Test",
-            SkillsNeeded = "C#,SQL",
-            MinExperienceMonths = 12,
-            AvailabilityStart = new DateTime(2026, 01, 01),
-            RequiredPrimarySkillLevel = "P2"
-        });
+            var service = new MatchingService(
+                CreateDb(),
+                Mock.Of<ICandidateClient>());
 
-        await context.SaveChangesAsync();
+            Action act = () => service.GetRankedMatchesAsync(0).GetAwaiter().GetResult();
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
+            act.Should().Throw<ArgumentException>();
+        }
+
+        [Test]
+        public void GetRankedMatches_ShouldThrow_WhenRequirementMissing()
+        {
+            var service = new MatchingService(
+                CreateDb(),
+                Mock.Of<ICandidateClient>());
+
+            Action act = () => service.GetRankedMatchesAsync(1).GetAwaiter().GetResult();
+
+            act.Should().Throw<KeyNotFoundException>();
+        }
+
+        [Test]
+        public async Task GetRankedMatches_ShouldCalculateScoreAndOrder()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
             {
+                Id = 1,
+                SkillsNeeded = "C#,SQL",
+                MinExperienceMonths = 5,
+                MaxExperienceMonths = 20,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(30),
+                RequiredPrimarySkillLevel = "P2"
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    5, 20,
+                    "C#,SQL",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P2",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                        new CandidateDto
+                        {
+                            Id = 1,
+                            SkillSet = "C#,SQL",
+                            ExperienceMonths = 10,
+                            AvailabilityDate = DateTime.UtcNow,
+                            PrimarySkillLevel = "P3"
+                        },
+                        new CandidateDto
+                        {
+                            Id = 2,
+                            SkillSet = "C#",
+                            ExperienceMonths = 5,
+                            AvailabilityDate = DateTime.UtcNow.AddDays(5),
+                            PrimarySkillLevel = "P2"
+                        }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(2);
+            result.First().Score.Should().BeGreaterThan(result.Last().Score);
+        }
+
+        // ======================================================
+        // EDGE CASES
+        // ======================================================
+
+        [Test]
+        public async Task GetRankedMatches_ShouldHandle_InvalidPrimarySkillLevel()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "",
+                MinExperienceMonths = 0,
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = ""
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    0, 10,
+                    "",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                        new CandidateDto
+                        {
+                            Id = 1,
+                            SkillSet = "",
+                            ExperienceMonths = 0,
+                            AvailabilityDate = DateTime.UtcNow,
+                            PrimarySkillLevel = "X"
+                        }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+        [Test]
+        public async Task GetRankedMatches_ShouldHandle_ZeroRequiredSkills()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "", // ZERO skills
+                MinExperienceMonths = 5,
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "P1"
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    5, 10, "",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P1",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
                 new CandidateDto
                 {
-                    Id = 10,
-                    Name = "John",
-                    SkillSet = "C#,SQL",
-                    ExperienceMonths = 24,
-                    AvailabilityDate = new DateTime(2025,12,01),
-                    PrimarySkillLevel = "P3"
+                    Id = 1,
+                    SkillSet = "",
+                    ExperienceMonths = 5,
+                    AvailabilityDate = DateTime.UtcNow,
+                    PrimarySkillLevel = "P1"
                 }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+
+        [Test]
+        public async Task GetRankedMatches_ShouldHandle_MinExperienceZero()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "C#",
+                MinExperienceMonths = 0, // branch
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "P1"
             });
 
-        var service = new MatchingService(context, mockClient.Object);
+            db.SaveChanges();
 
-        var result = await service.MatchCandidatesAsync(1);
-
-        result.Should().HaveCount(1);
-        result[0].CandidateId.Should().Be(10);
-    }
-
-    [Test]
-    public async Task MatchCandidates_ShouldReturnEmpty_WhenNoMatch()
-    {
-        var context = CreateDbContext();
-
-        context.Requirements.Add(new Requirement
-        {
-            Id = 1,
-            SkillsNeeded = "Java",
-            MinExperienceMonths = 12,
-            AvailabilityStart = DateTime.UtcNow,
-            RequiredPrimarySkillLevel = "P3"
-        });
-
-        await context.SaveChangesAsync();
-
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
-            {
+            var mockClient = new Mock<ICandidateClient>();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    0, 10, "C#",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P1",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
                 new CandidateDto
                 {
-                    Id = 10,
+                    Id = 1,
+                    SkillSet = "C#",
+                    ExperienceMonths = 0,
+                    AvailabilityDate = DateTime.UtcNow,
+                    PrimarySkillLevel = "P1"
+                }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+
+        [Test]
+        public async Task GetRankedMatches_ShouldHandle_AvailabilityFail()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "C#",
+                MinExperienceMonths = 1,
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "P1"
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    1, 10, "C#",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P1",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                new CandidateDto
+                {
+                    Id = 1,
+                    SkillSet = "C#",
+                    ExperienceMonths = 5,
+                    AvailabilityDate = DateTime.UtcNow.AddDays(10), // FAIL branch
+                    PrimarySkillLevel = "P1"
+                }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+
+        [Test]
+        public async Task GetRankedMatches_ShouldHandle_InvalidLevelFormat()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "C#",
+                MinExperienceMonths = 1,
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "X" // invalid
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    1, 10, "C#",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "X",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                new CandidateDto
+                {
+                    Id = 1,
+                    SkillSet = "C#",
+                    ExperienceMonths = 5,
+                    AvailabilityDate = DateTime.UtcNow,
+                    PrimarySkillLevel = "Z"
+                }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+        [Test]
+        public async Task GetRankedMatches_ShouldCover_ExperienceLessThanMin()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "C#",
+                MinExperienceMonths = 10,
+                MaxExperienceMonths = 20,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "P1"
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    10, 20,
+                    "C#",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P1",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                new CandidateDto
+                {
+                    Id = 1,
+                    SkillSet = "C#",
+                    ExperienceMonths = 5, // LESS THAN MIN
+                    AvailabilityDate = DateTime.UtcNow,
+                    PrimarySkillLevel = "P1"
+                }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+        [Test]
+        public async Task GetRankedMatches_ShouldCover_ProficiencyLessThanRequired()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "C#",
+                MinExperienceMonths = 1,
+                MaxExperienceMonths = 20,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "P3"
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    1, 20,
+                    "C#",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P3",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                new CandidateDto
+                {
+                    Id = 1,
+                    SkillSet = "C#",
+                    ExperienceMonths = 5,
+                    AvailabilityDate = DateTime.UtcNow,
+                    PrimarySkillLevel = "P1" // LESS THAN REQUIRED
+                }
+                    }
+                });
+
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+        [Test]
+        public async Task GetRankedMatches_ShouldCover_WhenNoRequiredSkills()
+        {
+            var db = CreateDb();
+
+            db.Requirements.Add(new Requirement
+            {
+                Id = 1,
+                SkillsNeeded = "", // 🔥 EMPTY SKILLS
+                MinExperienceMonths = 1,
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "P1"
+            });
+
+            db.SaveChanges();
+
+            var mockClient = new Mock<ICandidateClient>();
+
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    1,
+                    10,
+                    "",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P1",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                new CandidateDto
+                {
+                    Id = 1,
                     SkillSet = "C#",
                     ExperienceMonths = 5,
                     AvailabilityDate = DateTime.UtcNow,
                     PrimarySkillLevel = "P1"
                 }
-            });
+                    }
+                });
 
-        var service = new MatchingService(context, mockClient.Object);
+            var service = new MatchingService(db, mockClient.Object);
 
-        var result = await service.MatchCandidatesAsync(1);
+            var result = await service.GetRankedMatchesAsync(1);
 
-        result.Should().BeEmpty();
-    }
-    [Test]
-    public void GetRankedMatchesAsync_ShouldThrow_WhenIdZeroOrNegative()
-    {
-        var service = new MatchingService(CreateDbContext(), Mock.Of<ICandidateClient>());
-
-        Func<Task> act1 = async () => await service.GetRankedMatchesAsync(0);
-        Func<Task> act2 = async () => await service.GetRankedMatchesAsync(-5);
-
-        act1.Should().ThrowAsync<ArgumentException>();
-        act2.Should().ThrowAsync<ArgumentException>();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldThrow_WhenRequirementMissing()
-    {
-        var service = new MatchingService(CreateDbContext(), Mock.Of<ICandidateClient>());
-
-        Func<Task> act = async () => await service.GetRankedMatchesAsync(1);
-
-        await act.Should().ThrowAsync<KeyNotFoundException>()
-            .WithMessage("Requirement not found");
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldExclude_WhenExperienceTooLow()
-    {
-        var context = CreateDbContext();
-
-        context.Requirements.Add(new Requirement
+            result.Should().HaveCount(1);
+        }
+        [Test]
+        public async Task GetRankedMatches_ShouldCover_AvailabilityAfterStart()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 24,
-            AvailabilityStart = DateTime.UtcNow,
-            RequiredPrimarySkillLevel = "P1"
-        });
-        await context.SaveChangesAsync();
+            var db = CreateDb();
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
-            {
-            new CandidateDto
+            db.Requirements.Add(new Requirement
             {
                 Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 12, // Too low
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = "P1"
-            }
+                SkillsNeeded = "C#",
+                MinExperienceMonths = 1,
+                MaxExperienceMonths = 10,
+                AvailabilityStart = DateTime.UtcNow,
+                AvailabilityEnd = DateTime.UtcNow.AddDays(5),
+                RequiredPrimarySkillLevel = "P1"
             });
 
-        var service = new MatchingService(context, mockClient.Object);
+            db.SaveChanges();
 
-        var result = await service.GetRankedMatchesAsync(1);
+            var mockClient = new Mock<ICandidateClient>();
 
-        result.Should().BeEmpty();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldExclude_WhenAvailabilityAfterStart()
-    {
-        var context = CreateDbContext();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    1,
+                    10,
+                    "C#",
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    "P1",
+                    1,
+                    1000))
+                .ReturnsAsync(new PaginatedCandidateResponse
+                {
+                    Data = new List<CandidateDto>
+                    {
+                new CandidateDto
+                {
+                    Id = 1,
+                    SkillSet = "C#",
+                    ExperienceMonths = 5,
+                    AvailabilityDate = DateTime.UtcNow.AddDays(10), // AFTER START
+                    PrimarySkillLevel = "P1"
+                }
+                    }
+                });
 
-        context.Requirements.Add(new Requirement
+            var service = new MatchingService(db, mockClient.Object);
+
+            var result = await service.GetRankedMatchesAsync(1);
+
+            result.Should().HaveCount(1);
+        }
+        [Test]
+        public async Task GetByExperience_ShouldReturnBadRequest_WhenMinGreaterThanMax()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 1,
-            AvailabilityStart = new DateTime(2026, 1, 1),
-            RequiredPrimarySkillLevel = "P1"
-        });
-        await context.SaveChangesAsync();
+            var controller = new RequirementFilterController(
+                Mock.Of<ICandidateClient>());
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
-            {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 12,
-                AvailabilityDate = new DateTime(2026, 2, 1), // Too late
-                PrimarySkillLevel = "P1"
-            }
-            });
+            var result = await controller.GetByExperience(10, 5);
 
-        var service = new MatchingService(context, mockClient.Object);
-
-        var result = await service.GetRankedMatchesAsync(1);
-
-        result.Should().BeEmpty();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldExclude_WhenSkillLevelInvalid()
-    {
-        var context = CreateDbContext();
-
-        context.Requirements.Add(new Requirement
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+        [Test]
+        public async Task GetByAvailability_ShouldReturnBadRequest_WhenStartAfterEnd()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 1,
-            AvailabilityStart = DateTime.UtcNow,
-            RequiredPrimarySkillLevel = "P3"
-        });
-        await context.SaveChangesAsync();
+            var controller = new RequirementFilterController(
+                Mock.Of<ICandidateClient>());
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
-            {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 12,
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = "INVALID"
-            }
-            });
+            var result = await controller.GetByAvailability(
+                DateTime.UtcNow.AddDays(5),
+                DateTime.UtcNow);
 
-        var service = new MatchingService(context, mockClient.Object);
-
-        var result = await service.GetRankedMatchesAsync(1);
-
-        result.Should().BeEmpty();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldCalculateFullScore_WhenExperienceHigher()
-    {
-        var context = CreateDbContext();
-
-        context.Requirements.Add(new Requirement
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+        [Test]
+        public async Task GetByPrimarySkillLevel_ShouldReturnBadRequest_WhenWhitespace()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 12,
-            AvailabilityStart = DateTime.UtcNow.AddDays(1),
-            RequiredPrimarySkillLevel = "P1"
-        });
-        await context.SaveChangesAsync();
+            var controller = new RequirementFilterController(
+                Mock.Of<ICandidateClient>());
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
-            {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 24,
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = "P2"
-            }
-            });
+            var result = await controller.GetByPrimarySkillLevel("   ");
 
-        var service = new MatchingService(context, mockClient.Object);
-
-        var result = await service.GetRankedMatchesAsync(1);
-
-        result.Should().HaveCount(1);
-        result[0].Score.Should().BeGreaterThan(0);
-    }
-
-    [Test]
-    public async Task MatchCandidates_ShouldReturnBadRequest_WhenIdZero()
-    {
-        var controller = new RequirementsController(
-            CreateDbContext(),
-            Mock.Of<IMatchingService>(),
-            Mock.Of<IRequirementService>());
-
-        var result = await controller.MatchCandidates(0);
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldHandle_NullSkillLevel()
-    {
-        var context = CreateDbContext();
-
-        context.Requirements.Add(new Requirement
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+        [Test]
+        public async Task GetByExperience_ShouldReturnOk_WithResult()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 1,
-            AvailabilityStart = DateTime.UtcNow.AddDays(1),
-            RequiredPrimarySkillLevel = "P1"
-        });
+            var mockClient = new Mock<ICandidateClient>();
 
-        await context.SaveChangesAsync();
-
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
+            var expected = new PaginatedCandidateResponse
             {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 10,
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = null   // covers null branch
-            }
-            });
+                Data = new List<CandidateDto>()
+            };
 
-        var service = new MatchingService(context, mockClient.Object);
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    1, 5,
+                    null,
+                    null,
+                    null,
+                    null,
+                    1,
+                    50))
+                .ReturnsAsync(expected);
 
-        var result = await service.GetRankedMatchesAsync(1);
+            var controller = new RequirementFilterController(mockClient.Object);
 
-        result.Should().BeEmpty();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldHandle_ShortSkillLevel()
-    {
-        var context = CreateDbContext();
+            var result = await controller.GetByExperience(1, 5);
 
-        context.Requirements.Add(new Requirement
+            var ok = result as OkObjectResult;
+
+            ok.Should().NotBeNull();
+            ok!.Value.Should().BeSameAs(expected);
+        }
+        [Test]
+        public async Task GetByAvailability_ShouldReturnOk_WithResult()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 1,
-            AvailabilityStart = DateTime.UtcNow.AddDays(1),
-            RequiredPrimarySkillLevel = "P2"
-        });
+            var mockClient = new Mock<ICandidateClient>();
 
-        await context.SaveChangesAsync();
-
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
+            var expected = new PaginatedCandidateResponse
             {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 10,
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = "P"   // length < 2
-            }
-            });
+                Data = new List<CandidateDto>()
+            };
 
-        var service = new MatchingService(context, mockClient.Object);
+            var start = DateTime.UtcNow;
+            var end = start.AddDays(5);
 
-        var result = await service.GetRankedMatchesAsync(1);
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    0,
+                    int.MaxValue,
+                    null,
+                    start,
+                    end,
+                    null,
+                    1,
+                    50))
+                .ReturnsAsync(expected);
 
-        result.Should().BeEmpty();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldHandle_InvalidNumericSkillLevel()
-    {
-        var context = CreateDbContext();
+            var controller = new RequirementFilterController(mockClient.Object);
 
-        context.Requirements.Add(new Requirement
+            var result = await controller.GetByAvailability(start, end);
+
+            var ok = result as OkObjectResult;
+
+            ok.Should().NotBeNull();
+            ok!.Value.Should().BeSameAs(expected);
+        }
+        [Test]
+        public async Task GetByPrimarySkillLevel_ShouldReturnOk_WithResult()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 1,
-            AvailabilityStart = DateTime.UtcNow.AddDays(1),
-            RequiredPrimarySkillLevel = "P3"
-        });
+            var mockClient = new Mock<ICandidateClient>();
 
-        await context.SaveChangesAsync();
-
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
+            var expected = new PaginatedCandidateResponse
             {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 10,
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = "PX"   // TryParse fails
-            }
-            });
+                Data = new List<CandidateDto>()
+            };
 
-        var service = new MatchingService(context, mockClient.Object);
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    0,
+                    int.MaxValue,
+                    null,
+                    null,
+                    null,
+                    "P1",
+                    1,
+                    50))
+                .ReturnsAsync(expected);
 
-        var result = await service.GetRankedMatchesAsync(1);
+            var controller = new RequirementFilterController(mockClient.Object);
 
-        result.Should().BeEmpty();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldReturnMidpointScore_WhenExperienceEqualsMin()
-    {
-        var context = CreateDbContext();
+            var result = await controller.GetByPrimarySkillLevel("P1");
 
-        context.Requirements.Add(new Requirement
+            var ok = result as OkObjectResult;
+
+            ok.Should().NotBeNull();
+            ok!.Value.Should().BeSameAs(expected);
+        }
+        [Test]
+        public async Task GetByExperience_ShouldThrow_WhenClientThrows()
         {
-            Id = 1,
-            SkillsNeeded = "C#",
-            MinExperienceMonths = 10,
-            AvailabilityStart = DateTime.UtcNow.AddDays(1),
-            RequiredPrimarySkillLevel = "P1"
-        });
+            var mockClient = new Mock<ICandidateClient>();
 
-        await context.SaveChangesAsync();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<int>(),
+                    It.IsAny<string>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<string>(),
+                    It.IsAny<int>(),
+                    It.IsAny<int>()))
+                .ThrowsAsync(new Exception("Client failure"));
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
-            {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "C#",
-                ExperienceMonths = 10, // equal
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = "P2"
-            }
-            });
+            var controller = new RequirementFilterController(mockClient.Object);
 
-        var service = new MatchingService(context, mockClient.Object);
+            Func<Task> act = async () => await controller.GetByExperience(1, 5);
 
-        var result = await service.GetRankedMatchesAsync(1);
-
-        result.Should().HaveCount(1);
-    }
-    [Test]
-    public void GetRankedMatchesAsync_ShouldThrow_WhenIdNegative()
-    {
-        var service = new MatchingService(CreateDbContext(), Mock.Of<ICandidateClient>());
-
-        Func<Task> act = async () => await service.GetRankedMatchesAsync(-1);
-
-        act.Should().ThrowAsync<ArgumentException>();
-    }
-    [Test]
-    public async Task GetRankedMatchesAsync_ShouldExclude_WhenNoSkillsMatch()
-    {
-        var context = CreateDbContext();
-
-        context.Requirements.Add(new Requirement
+            await act.Should().ThrowAsync<Exception>();
+        }
+        [Test]
+        public async Task GetByAvailability_ShouldThrow_WhenClientThrows()
         {
-            Id = 1,
-            SkillsNeeded = "C#,SQL",
-            MinExperienceMonths = 1,
-            AvailabilityStart = DateTime.UtcNow.AddDays(1),
-            RequiredPrimarySkillLevel = "P1"
-        });
+            var mockClient = new Mock<ICandidateClient>();
 
-        await context.SaveChangesAsync();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<int>(),
+                    It.IsAny<string>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<string>(),
+                    It.IsAny<int>(),
+                    It.IsAny<int>()))
+                .ThrowsAsync(new Exception("Client failure"));
 
-        var mockClient = new Mock<ICandidateClient>();
-        mockClient.Setup(x => x.GetAllCandidatesAsync())
-            .ReturnsAsync(new List<CandidateDto>
-            {
-            new CandidateDto
-            {
-                Id = 1,
-                SkillSet = "Java,Python",  // ZERO overlap
-                ExperienceMonths = 10,
-                AvailabilityDate = DateTime.UtcNow,
-                PrimarySkillLevel = "P2"
-            }
-            });
+            var controller = new RequirementFilterController(mockClient.Object);
 
-        var service = new MatchingService(context, mockClient.Object);
+            Func<Task> act = async () =>
+                await controller.GetByAvailability(DateTime.UtcNow, DateTime.UtcNow.AddDays(1));
 
-        var result = await service.GetRankedMatchesAsync(1);
+            await act.Should().ThrowAsync<Exception>();
+        }
+        [Test]
+        public async Task GetByPrimarySkillLevel_ShouldThrow_WhenClientThrows()
+        {
+            var mockClient = new Mock<ICandidateClient>();
 
-        result.Should().BeEmpty();
+            mockClient.Setup(x => x.SearchCandidatesAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<int>(),
+                    It.IsAny<string>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<string>(),
+                    It.IsAny<int>(),
+                    It.IsAny<int>()))
+                .ThrowsAsync(new Exception("Client failure"));
+
+            var controller = new RequirementFilterController(mockClient.Object);
+
+            Func<Task> act = async () =>
+                await controller.GetByPrimarySkillLevel("P1");
+
+            await act.Should().ThrowAsync<Exception>();
+        }                   
     }
-
-
-
-
-
 
 }
-
-

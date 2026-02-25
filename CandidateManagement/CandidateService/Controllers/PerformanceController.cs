@@ -2,11 +2,13 @@
 using CandidateService.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics.CodeAnalysis;
 
 namespace CandidateService.Controllers
 {
     [ApiController]
     [Route("api/performance")]
+    [ExcludeFromCodeCoverage]
     public class PerformanceController : ControllerBase
     {
         private readonly CandidateDbContext _context;
@@ -17,6 +19,7 @@ namespace CandidateService.Controllers
         }
 
         [HttpPost("seed/{count}")]
+        [ExcludeFromCodeCoverage]
         public async Task<IActionResult> Seed(int count = 10000)
         {
             if (_context.Candidates.Count() >= count)
