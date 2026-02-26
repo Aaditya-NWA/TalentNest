@@ -145,87 +145,16 @@ public class ReportManager : IReportManager
     }
 
     public async Task<RequirementFulfillmentReportResponse>
-      GetRequirementFulfillmentReportAsync()
-    {
-        var candidates = await _candidates.GetAllAsync();
-        var requirements = await _requirements.GetAllAsync();
-
-        var allInterviews = await _interviews.GetAllAsync();
-
-
-        var result = new List<RequirementFulfillmentInfo>();
-
-        foreach (var requirement in requirements)
+    GetRequirementFulfillmentReportAsync()
         {
-            var matchedCandidates = candidates
-    .Where(c =>
-    {
-        var candidateSkills = (c.SkillSet ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim())
-            .ToList();
+            var paged =
+                await GetRequirementFulfillmentPagedAsync(1, int.MaxValue);
 
-        var requirementSkills = (requirement.SkillsNeeded ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim())
-            .ToList();
-
-        var hasSkills =
-            requirementSkills.All(skill =>
-                candidateSkills.Contains(skill));
-
-        var experienceMatch =
-            c.ExperienceMonths >= requirement.MinExperienceMonths &&
-            c.ExperienceMonths <= requirement.MaxExperienceMonths;
-
-        var primarySkillMatch =
-            string.IsNullOrWhiteSpace(requirement.RequiredPrimarySkillLevel)
-            || c.PrimarySkillLevel == requirement.RequiredPrimarySkillLevel;
-
-        return hasSkills &&
-               experienceMatch &&
-               primarySkillMatch;
-    })
-    .ToList();
-
-
-            var interviewedCandidates = allInterviews
-                .Where(i => i.Project == requirement.Project)
-                .Select(i => i.CandidateId)
-                .Distinct()
-                .Count();
-
-            var selectedCandidates = allInterviews
-                .Where(i =>
-                    i.Project == requirement.Project &&
-                    i.FinalOutcome == "Selected")
-                .Select(i => i.CandidateId)
-                .Distinct()
-                .Count();
-
-            var fulfillmentPercentage =
-                matchedCandidates.Count == 0
-                    ? 0
-                    : (double)selectedCandidates /
-                      matchedCandidates.Count * 100;
-
-            result.Add(new RequirementFulfillmentInfo
+            return new RequirementFulfillmentReportResponse
             {
-                RequirementId = requirement.Id,
-                Project = requirement.Project,
-                MatchedCandidates = matchedCandidates.Count,
-                InterviewedCandidates = interviewedCandidates,
-                SelectedCandidates = selectedCandidates,
-                FulfillmentPercentage =
-                    Math.Round(fulfillmentPercentage, 2)
-            });
+                Requirements = paged.Requirements
+            };
         }
-
-        return new RequirementFulfillmentReportResponse
-        {
-            Requirements = result
-        };
-    }
 
     public async Task<OutcomeReportResponse>
         GetOutcomeReportAsync()
@@ -258,12 +187,13 @@ public class ReportManager : IReportManager
         if (requestCount <= 0)
             throw new ArgumentException("Request count must be positive.");
 
-        var requirements = await _requirements.GetAllAsync();
+        var page = await _requirements.GetPageAsync(1, 1);
 
-        if (!requirements.Any())
-            throw new InvalidOperationException("No requirements available for performance test.");
+        if (!page.Data.Any())
+            throw new InvalidOperationException(
+                "No requirements available for performance test.");
 
-        var requirementId = requirements.First().Id;
+        var requirementId = page.Data.First().Id;
 
         var latencies = new List<double>();
 
@@ -316,8 +246,10 @@ public class ReportManager : IReportManager
             await _interviews
             .GetByCandidateAsync(id);
 
-        var requirements =
-            await _requirements.GetAllAsync();
+        var requirementPage =
+            await _requirements.GetPageAsync(1, int.MaxValue);
+
+        var requirements = requirementPage.Data;
 
         return new CandidateDetailedReportResponse
         {
@@ -416,6 +348,88 @@ public class ReportManager : IReportManager
             AvailableCandidates = available,
             AvailabilityPercentage = Math.Round(percent, 2),
             BlockedCandidatesLast6Months = blocked
+        };
+    }
+    public async Task<RequirementFulfillmentPagedResponse>
+    GetRequirementFulfillmentPagedAsync(int page, int pageSize)
+    {
+        if (page <= 0 || pageSize <= 0)
+            throw new ArgumentException("Invalid pagination parameters");
+
+        var requirementPage =
+            await _requirements.GetPageAsync(page, pageSize);
+
+        var candidates = await _candidates.GetAllAsync();
+        var interviews = await _interviews.GetAllAsync();
+
+        var result = new List<RequirementFulfillmentInfo>();
+
+        foreach (var requirement in requirementPage.Data)
+        {
+            var matchedCandidates = candidates
+                .Where(c =>
+                {
+                    var candidateSkills = (c.SkillSet ?? "")
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim());
+
+                    var requirementSkills = (requirement.SkillsNeeded ?? "")
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim());
+
+                    var hasSkills =
+                        requirementSkills.All(skill =>
+                            candidateSkills.Contains(skill));
+
+                    var experienceMatch =
+                        c.ExperienceMonths >= requirement.MinExperienceMonths &&
+                        c.ExperienceMonths <= requirement.MaxExperienceMonths;
+
+                    var primarySkillMatch =
+                        string.IsNullOrWhiteSpace(requirement.RequiredPrimarySkillLevel)
+                        || c.PrimarySkillLevel == requirement.RequiredPrimarySkillLevel;
+
+                    return hasSkills && experienceMatch && primarySkillMatch;
+                })
+                .ToList();
+
+            var interviewedCandidates = interviews
+                .Where(i => i.Project == requirement.Project)
+                .Select(i => i.CandidateId)
+                .Distinct()
+                .Count();
+
+            var selectedCandidates = interviews
+                .Where(i =>
+                    i.Project == requirement.Project &&
+                    i.FinalOutcome == "Selected")
+                .Select(i => i.CandidateId)
+                .Distinct()
+                .Count();
+
+            var fulfillmentPercentage =
+                matchedCandidates.Count == 0
+                    ? 0
+                    : (double)selectedCandidates / matchedCandidates.Count * 100;
+
+            result.Add(new RequirementFulfillmentInfo
+            {
+                RequirementId = requirement.Id,
+                Project = requirement.Project,
+                MatchedCandidates = matchedCandidates.Count,
+                InterviewedCandidates = interviewedCandidates,
+                SelectedCandidates = selectedCandidates,
+                FulfillmentPercentage = Math.Round(fulfillmentPercentage, 2)
+            });
+        }
+
+        return new RequirementFulfillmentPagedResponse
+        {
+            Page = page,
+            PageSize = pageSize,
+            TotalRequirements = requirementPage.TotalCount,
+            TotalPages = requirementPage.TotalPages,
+            Requirements = result
         };
     }
 }

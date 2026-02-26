@@ -15,4 +15,5 @@ public interface IReportManager
     Task<OutcomeReportResponse> GetOutcomeReportAsync();
     Task<PerformanceReportResponse> RunPerformanceTestAsync(int requestCount);
     Task<CandidateDetailedReportResponse?> GetCandidateDetailedReportAsync(int candidateId);
+    Task<RequirementFulfillmentPagedResponse>GetRequirementFulfillmentPagedAsync(int page, int pageSize);
 }

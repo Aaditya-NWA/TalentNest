@@ -43,16 +43,34 @@ namespace RequirementService.Controllers
             return Ok(requirement);
         }
         [HttpGet]
-        public async Task<IActionResult> GetAll(int page = 1, int pageSize = 50)
+        public async Task<IActionResult> GetAll(
+            int page = 1,
+            int pageSize = 50)
         {
-            var result = await _context.Requirements
+            if (page <= 0 || pageSize <= 0)
+                return BadRequest("Invalid pagination parameters");
+
+            var totalCount =
+                await _context.Requirements.CountAsync();
+
+            var totalPages =
+                (int)Math.Ceiling(totalCount / (double)pageSize);
+
+            var data = await _context.Requirements
                 .AsNoTracking()
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            return Ok(result);
+            return Ok(new PaginatedRequirementResponse
+            {
+                Data = data,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages
+            });
         }
 
 

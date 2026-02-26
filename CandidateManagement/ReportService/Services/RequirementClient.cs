@@ -13,7 +13,7 @@ public class RequirementClient
     {
         _http = http;
     }
-
+    [Obsolete("Do not use after pagination. Use GetPageAsync instead.")]
     public async Task<List<RequirementDto>> GetAllAsync()
     {
         var response = await _http.GetAsync("/api/requirements");
@@ -32,5 +32,15 @@ public class RequirementClient
         return await _http.GetFromJsonAsync<RequirementCountDto>(
             "/api/requirements/count"
         ) ?? new RequirementCountDto(0);
+    }
+    public async Task<PagedRequirementResponse> GetPageAsync(
+    int page,
+    int pageSize)
+    {
+        var response = await _http.GetFromJsonAsync<PagedRequirementResponse>(
+            $"/api/requirements?page={page}&pageSize={pageSize}"
+        );
+
+        return response ?? new PagedRequirementResponse();
     }
 }

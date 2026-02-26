@@ -40,9 +40,14 @@ public class ReportsController : ControllerBase
         return Ok(result);
     }
     [HttpGet("requirement-fulfillment")]
-    public async Task<IActionResult> GetRequirementFulfillmentReport()
+    public async Task<IActionResult> GetRequirementFulfillmentReport(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 20)
     {
-        var result = await _reportManager.GetRequirementFulfillmentReportAsync();
+        var result =
+            await _reportManager
+                .GetRequirementFulfillmentPagedAsync(page, pageSize);
+
         return Ok(result);
     }
     [HttpGet("outcomes")]
