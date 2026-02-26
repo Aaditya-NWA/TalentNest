@@ -172,8 +172,7 @@ public class InterviewService : IInterviewService
     }
 
     [ExcludeFromCodeCoverage]
-    public async Task<List<InterviewResponse>>
-    GetInterviewsByCandidateAsync(int candidateId)
+    public async Task<List<InterviewResponse>>GetInterviewsByCandidateAsync(int candidateId)
 
     {
 

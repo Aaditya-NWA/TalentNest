@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\CandidateManagementAspire\CandidateManagementAspire.Web\CandidateManagementAspire.Web.csproj" />
     <ProjectReference Include="..\CandidateService\CandidateService.csproj" />
+	<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

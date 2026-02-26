@@ -1,6 +1,9 @@
-﻿using ReportService.DTOs;
+﻿using CandidateService.Models;
+using Microsoft.Extensions.Caching.Distributed;
+using ReportService.DTOs;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 
 namespace ReportService.Services;
 
@@ -10,17 +13,23 @@ public class ReportManager : IReportManager
     private readonly CandidateClient _candidates;
     private readonly IInterviewClient _interviews;
     private readonly RequirementClient _requirements;
-
+    private readonly IDistributedCache _cache;
     public ReportManager(
-        CandidateClient candidates,
-        IInterviewClient interviews,
-        RequirementClient requirements)
+    CandidateClient candidates,
+    IInterviewClient interviews,
+    RequirementClient requirements,
+    IDistributedCache cache)
     {
         _candidates = candidates;
         _interviews = interviews;
         _requirements = requirements;
+        _cache = cache;
     }
-
+    private static readonly JsonSerializerOptions CacheJsonOptions =
+    new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
     public async Task<ReportSummaryResponse> GetSystemSummaryAsync()
     {
         var candidateTask = _candidates.GetCountsAsync();
@@ -356,73 +365,98 @@ public class ReportManager : IReportManager
         if (page <= 0 || pageSize <= 0)
             throw new ArgumentException("Invalid pagination parameters");
 
+        // 1. Fetch paged requirements
         var requirementPage =
             await _requirements.GetPageAsync(page, pageSize);
 
-        var candidates = await _candidates.GetAllAsync();
-        var interviews = await _interviews.GetAllAsync();
+        // 2. Fetch candidates & interviews from Redis cache
+        var candidates = await GetCandidatesCachedAsync();
+        var interviews = await GetInterviewsCachedAsync();
+
+        // 3. Preprocess candidates ONCE (skills + filters)
+        var processedCandidates =
+            candidates.Select(c => new
+            {
+                Candidate = c,
+                Skills = (c.SkillSet ?? "")
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            })
+            .ToList();
+
+        // 4. Precompute interview stats ONCE (CRITICAL FIX)
+        var interviewStats =
+            interviews
+                .GroupBy(i => i.Project)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new
+                    {
+                        Interviewed = g
+                            .Select(x => x.CandidateId)
+                            .Distinct()
+                            .Count(),
+                        Selected = g
+                            .Where(x => x.FinalOutcome == "Selected")
+                            .Select(x => x.CandidateId)
+                            .Distinct()
+                            .Count()
+                    });
 
         var result = new List<RequirementFulfillmentInfo>();
 
+        // 5. Process each requirement in the page
         foreach (var requirement in requirementPage.Data)
         {
-            var matchedCandidates = candidates
-                .Where(c =>
+            var requirementSkills =
+                (requirement.SkillsNeeded ?? "")
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .ToList();
+
+            // Count matched candidates
+            int matchedCandidates =
+                processedCandidates.Count(pc =>
                 {
-                    var candidateSkills = (c.SkillSet ?? "")
-                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(s => s.Trim());
+                    var c = pc.Candidate;
 
-                    var requirementSkills = (requirement.SkillsNeeded ?? "")
-                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(s => s.Trim());
+                    if (!requirementSkills.All(pc.Skills.Contains))
+                        return false;
 
-                    var hasSkills =
-                        requirementSkills.All(skill =>
-                            candidateSkills.Contains(skill));
+                    if (c.ExperienceMonths < requirement.MinExperienceMonths ||
+                        c.ExperienceMonths > requirement.MaxExperienceMonths)
+                        return false;
 
-                    var experienceMatch =
-                        c.ExperienceMonths >= requirement.MinExperienceMonths &&
-                        c.ExperienceMonths <= requirement.MaxExperienceMonths;
+                    if (!string.IsNullOrWhiteSpace(requirement.RequiredPrimarySkillLevel) &&
+                        c.PrimarySkillLevel != requirement.RequiredPrimarySkillLevel)
+                        return false;
 
-                    var primarySkillMatch =
-                        string.IsNullOrWhiteSpace(requirement.RequiredPrimarySkillLevel)
-                        || c.PrimarySkillLevel == requirement.RequiredPrimarySkillLevel;
+                    return true;
+                });
 
-                    return hasSkills && experienceMatch && primarySkillMatch;
-                })
-                .ToList();
+            interviewStats.TryGetValue(requirement.Project, out var stat);
 
-            var interviewedCandidates = interviews
-                .Where(i => i.Project == requirement.Project)
-                .Select(i => i.CandidateId)
-                .Distinct()
-                .Count();
+            int interviewedCandidates = stat?.Interviewed ?? 0;
+            int selectedCandidates = stat?.Selected ?? 0;
 
-            var selectedCandidates = interviews
-                .Where(i =>
-                    i.Project == requirement.Project &&
-                    i.FinalOutcome == "Selected")
-                .Select(i => i.CandidateId)
-                .Distinct()
-                .Count();
-
-            var fulfillmentPercentage =
-                matchedCandidates.Count == 0
+            double fulfillmentPercentage =
+                matchedCandidates == 0
                     ? 0
-                    : (double)selectedCandidates / matchedCandidates.Count * 100;
+                    : (double)selectedCandidates / matchedCandidates * 100;
 
             result.Add(new RequirementFulfillmentInfo
             {
                 RequirementId = requirement.Id,
                 Project = requirement.Project,
-                MatchedCandidates = matchedCandidates.Count,
+                MatchedCandidates = matchedCandidates,
                 InterviewedCandidates = interviewedCandidates,
                 SelectedCandidates = selectedCandidates,
                 FulfillmentPercentage = Math.Round(fulfillmentPercentage, 2)
             });
         }
 
+        // 6. Return paged response
         return new RequirementFulfillmentPagedResponse
         {
             Page = page,
@@ -431,5 +465,62 @@ public class ReportManager : IReportManager
             TotalPages = requirementPage.TotalPages,
             Requirements = result
         };
+    }
+    private async Task<List<CandidateDto>> GetCandidatesCachedAsync()
+    {
+        try
+        {
+            var key = "candidates:all";
+            var cached = await _cache.GetStringAsync(key);
+
+            if (cached != null)
+                return JsonSerializer.Deserialize<List<CandidateDto>>(cached, CacheJsonOptions)!;
+
+            var data = await _candidates.GetAllAsync();
+
+            await _cache.SetStringAsync(
+                key,
+                JsonSerializer.Serialize(data, CacheJsonOptions),
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                });
+
+            return data;
+        }
+        catch
+        {
+            // 🔥 Redis down → fallback
+            return await _candidates.GetAllAsync();
+        }
+    }
+
+    private async Task<List<InterviewDto>> GetInterviewsCachedAsync()
+    {
+        try
+        {
+            var key = "interviews:all";
+            var cached = await _cache.GetStringAsync(key);
+
+            if (cached != null)
+                return JsonSerializer.Deserialize<List<InterviewDto>>(cached, CacheJsonOptions)!;
+
+            var data = await _interviews.GetAllAsync();
+
+            await _cache.SetStringAsync(
+                key,
+                JsonSerializer.Serialize(data, CacheJsonOptions),
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                });
+
+            return data;
+        }
+        catch
+        {
+            // 🔥 Redis down → fallback
+            return await _interviews.GetAllAsync();
+        }
     }
 }

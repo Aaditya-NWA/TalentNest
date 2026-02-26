@@ -43,6 +43,11 @@ builder.Services.AddHttpClient<RequirementClient>(client =>
 {
     client.BaseAddress = new Uri(requirementServiceUrl);
 });
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = "localhost:6379";
+    options.InstanceName = "ReportService:";
+});
 
 /* ----------------------------------------
    REPORT MANAGER REGISTRATION  ✅ FIX
