@@ -170,10 +170,13 @@ public class InterviewService : IInterviewService
             //Feedbacks = feedbacks
         };
     }
+
     [ExcludeFromCodeCoverage]
     public async Task<List<InterviewResponse>>
     GetInterviewsByCandidateAsync(int candidateId)
+
     {
+
         if (candidateId < 0)
             throw new ArgumentException("CandidateId cannot be negative");
 

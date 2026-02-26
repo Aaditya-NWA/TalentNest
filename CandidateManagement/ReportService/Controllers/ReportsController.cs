@@ -23,9 +23,14 @@ public class ReportsController : ControllerBase
         return Ok(result);
     }
     [HttpGet("candidate")]
-    public async Task<IActionResult> GetCandidateReport()
+    public async Task<IActionResult> GetCandidateReport(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 1000)
     {
-        var result = await _reportManager.GetCandidateReportAsync();
+        var result =
+            await _reportManager
+                .GetCandidateReportPagedAsync(page, pageSize);
+
         return Ok(result);
     }
     [HttpGet("interview-validation")]

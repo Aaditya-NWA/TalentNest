@@ -3,10 +3,12 @@ using FluentValidation;
 using FluentValidation.Results;
 using InterviewService.Contracts.Services;
 using InterviewService.Controllers;
+using InterviewService.Data;
 using InterviewService.DTOs.Requests.Interviews;
 using InterviewService.DTOs.Responses;
 using InterviewService.Models.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using NUnit.Framework;
 using System;
@@ -35,9 +37,18 @@ public class InterviewsControllerTests
         _controller = new InterviewsController(
             _service.Object,
             _createValidator.Object,
-            _updateValidator.Object);
+            _updateValidator.Object,
+            CreateDbContext()
+    );
     }
+    private InterviewDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<InterviewDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
 
+        return new InterviewDbContext(options);
+    }
     // ================= CREATE =================
 
     [Test]

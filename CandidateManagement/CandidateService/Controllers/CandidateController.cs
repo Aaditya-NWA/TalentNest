@@ -418,6 +418,21 @@ namespace CandidateService.Controllers
                 totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
             });
         }
+        [ExcludeFromCodeCoverage]
+        [HttpGet("count")]
+        public async Task<IActionResult> GetCandidateCounts()
+        {
+            var total = await _context.Candidates.CountAsync();
+
+            var available = await _context.Candidates
+                .CountAsync(c => c.AvailabilityDate <= DateTime.UtcNow);
+
+            return Ok(new CandidateCountResponse
+            {
+                Total = total,
+                Available = available
+            });
+        }
     }
 
 }

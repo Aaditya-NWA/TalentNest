@@ -55,5 +55,19 @@ public class CandidateClient
 
         return response?.TotalCount ?? 0;
     }
+    public async Task<CandidateCountDto> GetCountsAsync()
+    {
+        return await _http.GetFromJsonAsync<CandidateCountDto>(
+            "/api/candidates/count"
+        ) ?? new(0, 0);
+    }
 
+    public async Task<CandidateListResponse> GetPageAsync(
+    int page,
+    int pageSize)
+    {
+        return await _http.GetFromJsonAsync<CandidateListResponse>(
+            $"/api/candidates?page={page}&pageSize={pageSize}"
+        ) ?? new CandidateListResponse();
+    }
 }

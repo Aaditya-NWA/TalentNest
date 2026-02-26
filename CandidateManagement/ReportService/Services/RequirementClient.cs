@@ -25,4 +25,10 @@ public class RequirementClient
     {
         await _http.GetAsync($"/api/performance/p95/{id}");
     }
+    public async Task<RequirementCountDto> GetCountsAsync()
+    {
+        return await _http.GetFromJsonAsync<RequirementCountDto>(
+            "/api/requirements/count"
+        ) ?? new RequirementCountDto(0);
+    }
 }

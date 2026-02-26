@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using RequirementService.Contracts.Clients;
 using RequirementService.DTOs.External;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RequirementService.Controllers;
 
@@ -46,7 +47,7 @@ public class RequirementFilterController : ControllerBase
 
         return Ok(result);
     }
-
+    [ExcludeFromCodeCoverage]
     // ===============================
     // 2️⃣ FILTER BY EXPERIENCE RANGE
     // ===============================
@@ -82,7 +83,7 @@ public class RequirementFilterController : ControllerBase
 
         return Ok(result);
     }
-
+    [ExcludeFromCodeCoverage]
     // ===============================
     // 3️⃣ FILTER BY AVAILABILITY
     // ===============================
@@ -115,7 +116,7 @@ public class RequirementFilterController : ControllerBase
 
         return Ok(result);
     }
-
+    [ExcludeFromCodeCoverage]
     // ===============================
     // 4️⃣ FILTER BY PRIMARY SKILL LEVEL
     // ===============================

@@ -21,29 +21,18 @@ public class ReportManager : IReportManager
 
     public async Task<ReportSummaryResponse> GetSystemSummaryAsync()
     {
-        var candidatesTask = _candidates.GetAllAsync();
-        var interviewsTask = _interviews.GetAllAsync();
-        var requirementsTask = _requirements.GetAllAsync();
+        var candidateTask = _candidates.GetCountsAsync();
+        var interviewTask = _interviews.GetCountsAsync();
+        var requirementTask = _requirements.GetCountsAsync();
 
-        await Task.WhenAll(
-            candidatesTask,
-            interviewsTask,
-            requirementsTask);
-
-        var candidates = candidatesTask.Result;
-        var interviews = interviewsTask.Result;
-        var requirements = requirementsTask.Result;
+        await Task.WhenAll(candidateTask, interviewTask, requirementTask);
 
         return new ReportSummaryResponse
         {
-            TotalCandidates = candidates.Count,
-            TotalInterviews = interviews.Count,
-            ScheduledInterviews =
-                interviews.Count(i =>
-                    string.IsNullOrWhiteSpace(i.FinalOutcome)),
-            OpenRequirements =
-                requirements.Count(r =>
-                    r.Status == "Open")
+            TotalCandidates = candidateTask.Result.Total,
+            TotalInterviews = interviewTask.Result.Total,
+            ScheduledInterviews = interviewTask.Result.Scheduled,
+            OpenRequirements = requirementTask.Result.Open
         };
     }
 
@@ -360,6 +349,71 @@ public class ReportManager : IReportManager
                     i.InterviewDate >=
                     DateTime.UtcNow
                     .AddMonths(-6))
+        };
+    }
+    public async Task<CandidateReportPagedResponse>
+    GetCandidateReportPagedAsync(int page, int pageSize)
+    {
+        if (page <= 0 || pageSize <= 0)
+            throw new ArgumentException("Invalid pagination parameters");
+
+        var candidatePage =
+            await _candidates.GetPageAsync(page, pageSize);
+
+        var interviews =
+            await _interviews.GetAllAsync();
+
+        var candidates = candidatePage.Data;
+        var totalCandidates = candidatePage.TotalCount;
+
+        var sixMonthsAgo = DateTime.UtcNow.AddMonths(-6);
+
+        var blocked =
+            interviews
+                .Where(i => i.InterviewDate >= sixMonthsAgo)
+                .Select(i => i.CandidateId)
+                .Distinct()
+                .ToList();
+
+        var skills =
+            candidates
+                .SelectMany(c =>
+                    (c.SkillSet ?? "")
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim()))
+                .GroupBy(x => x)
+                .ToDictionary(x => x.Key, x => x.Count());
+
+        var proficiency =
+            candidates
+                .GroupBy(c =>
+                    string.IsNullOrWhiteSpace(c.PrimarySkillLevel)
+                        ? "Unknown"
+                        : c.PrimarySkillLevel)
+                .ToDictionary(x => x.Key, x => x.Count());
+
+        var available =
+            candidates.Count(c =>
+                c.AvailabilityDate <= DateTime.UtcNow);
+
+        var percent =
+            candidates.Count == 0
+                ? 0
+                : (double)available / candidates.Count * 100;
+
+        return new CandidateReportPagedResponse
+        {
+            Page = page,
+            PageSize = pageSize,
+            TotalCandidates = totalCandidates,
+            TotalPages = candidatePage.TotalPages,
+
+            SkillsDistribution = skills,
+            ProficiencyDistribution = proficiency,
+
+            AvailableCandidates = available,
+            AvailabilityPercentage = Math.Round(percent, 2),
+            BlockedCandidatesLast6Months = blocked
         };
     }
 }

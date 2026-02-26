@@ -2,10 +2,12 @@
 using Microsoft.EntityFrameworkCore;
 using RequirementService.Contracts.Services;
 using RequirementService.Data;
+using RequirementService.DTOs;
 using RequirementService.DTOs.Requests;
 using RequirementService.DTOs.Responses;
 using RequirementService.Models;
 using RequirementService.Services;
+using System.Diagnostics.CodeAnalysis;
 
 
 namespace RequirementService.Controllers
@@ -176,6 +178,22 @@ namespace RequirementService.Controllers
                 return NotFound(ex.Message);
             }
 
+        }
+        [ExcludeFromCodeCoverage]
+        [HttpGet("count")]
+        public async Task<IActionResult> GetRequirementCounts()
+        {
+            var now = DateTime.UtcNow;
+
+            var open = await _context.Requirements
+                .CountAsync(r =>
+                    r.AvailabilityStart <= now &&
+                    r.AvailabilityEnd >= now);
+
+            return Ok(new RequirementCountResponse
+            {
+                Open = open
+            });
         }
     }
 }

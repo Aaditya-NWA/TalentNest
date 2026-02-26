@@ -14,7 +14,12 @@ public class InterviewClient : IInterviewClient
         _http = http;
         _logger = logger;
     }
-
+    public async Task<InterviewCountDto> GetCountsAsync()
+    {
+        return await _http.GetFromJsonAsync<InterviewCountDto>(
+            "/internal/api/interviews/count"
+        ) ?? new InterviewCountDto(0, 0);
+    }
     public async Task<List<InterviewDto>> GetByCandidateAsync(int candidateId)
     {
         try
@@ -49,4 +54,5 @@ public class InterviewClient : IInterviewClient
             return new();
         }
     }
+    
 }

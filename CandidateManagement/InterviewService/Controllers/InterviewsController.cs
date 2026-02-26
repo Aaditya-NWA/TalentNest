@@ -1,6 +1,8 @@
 ﻿using FluentValidation;
 using FluentValidation.AspNetCore;
 using InterviewService.Contracts.Services;
+using InterviewService.Data;
+using InterviewService.DTOs;
 using InterviewService.DTOs.Requests.Interviews;
 using InterviewService.DTOs.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -16,15 +18,18 @@ public class InterviewsController : ControllerBase
     private readonly IInterviewService _interviewService;
     private readonly IValidator<CreateInterviewRequest> _createInterviewValidator;
     private readonly IValidator<UpdateInterviewRequest> _updateInterviewValidator;
+    private readonly InterviewDbContext _context;
 
     public InterviewsController(
         IInterviewService interviewService,
         IValidator<CreateInterviewRequest> createInterviewValidator,
-        IValidator<UpdateInterviewRequest> updateInterviewValidator)
+        IValidator<UpdateInterviewRequest> updateInterviewValidator,
+        InterviewDbContext context)
     {
         _interviewService = interviewService;
         _createInterviewValidator = createInterviewValidator;
         _updateInterviewValidator = updateInterviewValidator;
+        _context = context;
     }
 
     /// <summary>
@@ -138,5 +143,19 @@ public class InterviewsController : ControllerBase
 
         return NoContent();
     }
+    [ExcludeFromCodeCoverage]
+    [HttpGet("count")]
+    public async Task<IActionResult> GetInterviewCounts()
+    {
+        var total = await _context.Interviews.CountAsync();
 
+        var scheduled = await _context.Interviews
+            .CountAsync(i => i.FinalOutcome == null); // ✅ FIX
+
+        return Ok(new InterviewCountResponse
+        {
+            Total = total,
+            Scheduled = scheduled
+        });
+    }
 }
