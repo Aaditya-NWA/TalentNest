@@ -1,5 +1,8 @@
-﻿namespace ReportService.DTOs;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace ReportService.DTOs;
+
+[ExcludeFromCodeCoverage]
 public class PerformanceReportResponse
 {
     public int TotalRequests { get; set; }

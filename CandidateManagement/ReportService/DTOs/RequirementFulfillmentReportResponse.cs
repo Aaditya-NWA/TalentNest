@@ -1,9 +1,13 @@
-﻿namespace ReportService.DTOs;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace ReportService.DTOs;
+
+[ExcludeFromCodeCoverage]
 public class RequirementFulfillmentReportResponse
 {
     public List<RequirementFulfillmentInfo> Requirements { get; set; } = new();
 }
+[ExcludeFromCodeCoverage]
 
 public class RequirementFulfillmentInfo
 {

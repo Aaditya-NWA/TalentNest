@@ -3,15 +3,12 @@
 namespace ReportService.DTOs;
 
 [ExcludeFromCodeCoverage]
-public class CandidateListResponse
+public class RequirementFulfillmentPagedResponse
 {
-    public List<CandidateDto> Data { get; set; } = new();
-
     public int Page { get; set; }
-
     public int PageSize { get; set; }
-
-    public int TotalCount { get; set; }
-
+    public int TotalRequirements { get; set; }
     public int TotalPages { get; set; }
+
+    public List<RequirementFulfillmentInfo> Requirements { get; set; } = new();
 }

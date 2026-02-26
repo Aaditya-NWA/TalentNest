@@ -1,4 +1,5 @@
 using ReportService.Services;
+using System.Diagnostics.CodeAnalysis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,3 +70,6 @@ app.MapDefaultEndpoints();
 app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.Run();
+
+[ExcludeFromCodeCoverage]
+public partial class Program { }

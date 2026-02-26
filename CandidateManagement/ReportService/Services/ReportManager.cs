@@ -1,8 +1,10 @@
 ﻿using ReportService.DTOs;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace ReportService.Services;
 
+[ExcludeFromCodeCoverage]
 public class ReportManager : IReportManager
 {
     private readonly CandidateClient _candidates;

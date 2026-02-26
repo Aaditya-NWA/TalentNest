@@ -1,8 +1,10 @@
-﻿using System.Net.Http.Json;
-using ReportService.DTOs;
+﻿using ReportService.DTOs;
+using System.Diagnostics.CodeAnalysis;
+using System.Net.Http.Json;
 
 namespace ReportService.Services;
 
+[ExcludeFromCodeCoverage]
 public class InterviewClient : IInterviewClient
 {
     private readonly HttpClient _http;

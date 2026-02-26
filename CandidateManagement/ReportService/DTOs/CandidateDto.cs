@@ -1,5 +1,8 @@
-﻿namespace ReportService.DTOs;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace ReportService.DTOs;
+
+[ExcludeFromCodeCoverage]
 public class CandidateDto
 {
     public int Id { get; set; }

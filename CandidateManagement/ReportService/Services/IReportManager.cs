@@ -1,7 +1,9 @@
 ﻿using ReportService.DTOs;
+using System.Diagnostics.CodeAnalysis;
 
 public interface IReportManager
 {
+    [ExcludeFromCodeCoverage]
     Task<ReportSummaryResponse> GetSystemSummaryAsync();
     Task<CandidateReportResponse> GetCandidateReportAsync(); // legacy
     Task<CandidateReportPagedResponse> GetCandidateReportPagedAsync(

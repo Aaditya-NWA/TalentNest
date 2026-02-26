@@ -1,5 +1,8 @@
-﻿namespace ReportService.DTOs;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace ReportService.DTOs;
+
+[ExcludeFromCodeCoverage]
 public record InterviewDto(
     int Id,
     int CandidateId,
@@ -10,6 +13,8 @@ public record InterviewDto(
     string DecisionMaker,
     List<FeedbackDto> Feedbacks
 );
+
+[ExcludeFromCodeCoverage]
 
 public record FeedbackDto(
     int Id,

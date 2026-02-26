@@ -1,17 +1,14 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using RequirementService.Models;
 
-namespace ReportService.DTOs;
+namespace RequirementService.DTOs.Responses;
 
 [ExcludeFromCodeCoverage]
-public class CandidateListResponse
+public class PaginatedRequirementResponse
 {
-    public List<CandidateDto> Data { get; set; } = new();
-
+    public List<Requirement> Data { get; set; } = new();
     public int Page { get; set; }
-
     public int PageSize { get; set; }
-
     public int TotalCount { get; set; }
-
     public int TotalPages { get; set; }
 }

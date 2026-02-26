@@ -2,6 +2,7 @@
   <Folder Name="/CandidateManagementUnitTests/">
     <Project Path="CandidateService.Tests/CandidateService.Tests.csproj" />
     <Project Path="InterviewsService.Tests/InterviewsService.Tests.csproj" Id="a03577ef-66c1-4251-8b8c-feda36d662da" />
+    <Project Path="ReportsControllerTests.cs/ReportsControllerTests.csproj" Id="001fb753-6f7f-4380-9233-b9c76821eaec" />
     <Project Path="RequirementService.Tests/RequirementService.Tests.csproj" Id="1c2c6bd2-ba0a-4e36-a0b7-92967010a891" />
   </Folder>
   <Project Path="../CandidateManagement/CandidateService/CandidateService.csproj" />

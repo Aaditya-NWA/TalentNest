@@ -1,5 +1,8 @@
-﻿namespace ReportService.DTOs;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace ReportService.DTOs;
+
+[ExcludeFromCodeCoverage]
 public class CandidateDetailedReportResponse
 {
     public CandidateDto Candidate { get; set; } = new();
@@ -10,6 +13,8 @@ public class CandidateDetailedReportResponse
 
     public bool BlockedBySixMonthRule { get; set; }
 }
+
+[ExcludeFromCodeCoverage]
 
 public class RequirementSummaryDto
 {

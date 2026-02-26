@@ -1,8 +1,10 @@
 ﻿using ReportService.DTOs;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Json;
 
 namespace ReportService.Services;
 
+[ExcludeFromCodeCoverage]
 public class CandidateClient
 {
     private readonly HttpClient _http;

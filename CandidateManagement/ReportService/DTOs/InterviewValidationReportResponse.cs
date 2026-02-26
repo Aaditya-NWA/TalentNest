@@ -1,9 +1,14 @@
-﻿namespace ReportService.DTOs;
+﻿using System.Diagnostics.CodeAnalysis;
 
+namespace ReportService.DTOs;
+
+[ExcludeFromCodeCoverage]
 public class InterviewValidationReportResponse
 {
     public List<BlockedCandidateInfo> BlockedCandidates { get; set; } = new();
 }
+
+[ExcludeFromCodeCoverage]
 
 public class BlockedCandidateInfo
 {
