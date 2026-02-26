@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Moq;
 using NUnit.Framework;
 using RequirementService.Data;
@@ -7,6 +8,7 @@ using RequirementService.Models;
 using RequirementService.Services;
 using RequirementService.Contracts.Clients;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 
 namespace RequirementService.Tests;
 
@@ -38,7 +40,6 @@ public class MatchingRankingTests
 
         var candidates = new List<CandidateDto>
         {
-            // Perfect match
             new CandidateDto
             {
                 Id = 1,
@@ -48,8 +49,6 @@ public class MatchingRankingTests
                 AvailabilityDate = DateTime.UtcNow,
                 PrimarySkillLevel = "L3"
             },
-
-            // Partial match (1 skill)
             new CandidateDto
             {
                 Id = 2,
@@ -59,8 +58,6 @@ public class MatchingRankingTests
                 AvailabilityDate = DateTime.UtcNow,
                 PrimarySkillLevel = "L2"
             },
-
-            // Lower experience
             new CandidateDto
             {
                 Id = 3,
@@ -76,7 +73,16 @@ public class MatchingRankingTests
         mockClient.Setup(x => x.GetAllCandidatesAsync())
                   .ReturnsAsync(candidates);
 
-        _matchingService = new MatchingService(context, mockClient.Object);
-    }
+        var cacheMock = new Mock<IDistributedCache>();
+        cacheMock.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                 .ReturnsAsync((byte[]?)null);
+        cacheMock.Setup(c => c.SetAsync(
+                It.IsAny<string>(),
+                It.IsAny<byte[]>(),
+                It.IsAny<DistributedCacheEntryOptions>(),
+                It.IsAny<CancellationToken>()))
+             .Returns(Task.CompletedTask);
 
+        _matchingService = new MatchingService(context, mockClient.Object, cacheMock.Object);
+    }
 }

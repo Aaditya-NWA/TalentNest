@@ -30,6 +30,13 @@ builder.Services.AddHttpClient<ICandidateClient, CandidateClient>(client =>
 {
     client.BaseAddress = new Uri("https://localhost:7199"); // CandidateService URL
 });
+// Wherever your existing services are registered, add:
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = "localhost:6379";
+    options.InstanceName = "RequirementService:";  // ← note: different prefix than ReportService
+});
 
 var app = builder.Build();
 

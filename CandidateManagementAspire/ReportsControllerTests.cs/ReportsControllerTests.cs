@@ -9,7 +9,6 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace ReportService.Tests.Controllers;
 
-
 [TestFixture]
 [ExcludeFromCodeCoverage]
 public class ReportsControllerTests
@@ -103,16 +102,35 @@ public class ReportsControllerTests
     [Test]
     public async Task GetRequirementFulfillmentReport_ShouldReturnOk()
     {
-        var response = new RequirementFulfillmentReportResponse();
+        var response = new RequirementFulfillmentPagedResponse();
 
         _mockManager.Setup(x =>
-                x.GetRequirementFulfillmentReportAsync())
+                x.GetRequirementFulfillmentPagedAsync(1, 20))
             .ReturnsAsync(response);
 
         var result = await _controller.GetRequirementFulfillmentReport();
 
         result.Should().BeOfType<OkObjectResult>()
             .Which.Value.Should().Be(response);
+
+        _mockManager.Verify(x =>
+            x.GetRequirementFulfillmentPagedAsync(1, 20), Times.Once);
+    }
+
+    [Test]
+    public async Task GetRequirementFulfillmentReport_ShouldPassCustomPagination()
+    {
+        var response = new RequirementFulfillmentPagedResponse();
+
+        _mockManager.Setup(x =>
+                x.GetRequirementFulfillmentPagedAsync(2, 10))
+            .ReturnsAsync(response);
+
+        var result = await _controller.GetRequirementFulfillmentReport(2, 10);
+
+        result.Should().BeOfType<OkObjectResult>();
+        _mockManager.Verify(x =>
+            x.GetRequirementFulfillmentPagedAsync(2, 10), Times.Once);
     }
 
     #endregion

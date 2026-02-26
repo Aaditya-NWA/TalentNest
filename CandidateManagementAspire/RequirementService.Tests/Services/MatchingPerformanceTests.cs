@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Moq;
 using NUnit.Framework;
 using RequirementService.Contracts.Clients;
@@ -8,15 +9,14 @@ using RequirementService.Models;
 using RequirementService.Services;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 
 namespace RequirementService.Tests;
 
 [TestFixture]
-
 [ExcludeFromCodeCoverage]
 public class MatchingPerformanceTests
 {
-
     private MatchingService _matchingService;
 
     [SetUp]
@@ -28,7 +28,6 @@ public class MatchingPerformanceTests
 
         var context = new RequirementDbContext(options);
 
-        // Seed Requirement
         context.Requirements.Add(new Requirement
         {
             Id = 1,
@@ -40,7 +39,6 @@ public class MatchingPerformanceTests
 
         context.SaveChanges();
 
-        // Seed 10k Candidates
         var candidates = new List<CandidateDto>();
 
         for (int i = 1; i <= 10000; i++)
@@ -60,7 +58,16 @@ public class MatchingPerformanceTests
         mockClient.Setup(x => x.GetAllCandidatesAsync())
                   .ReturnsAsync(candidates);
 
-        _matchingService = new MatchingService(context, mockClient.Object);
-    }
+        var cacheMock = new Mock<IDistributedCache>();
+        cacheMock.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                 .ReturnsAsync((byte[]?)null);
+        cacheMock.Setup(c => c.SetAsync(
+                It.IsAny<string>(),
+                It.IsAny<byte[]>(),
+                It.IsAny<DistributedCacheEntryOptions>(),
+                It.IsAny<CancellationToken>()))
+             .Returns(Task.CompletedTask);
 
+        _matchingService = new MatchingService(context, mockClient.Object, cacheMock.Object);
+    }
 }

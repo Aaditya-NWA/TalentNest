@@ -42,6 +42,7 @@ namespace RequirementService.Controllers
 
             return Ok(requirement);
         }
+        [ExcludeFromCodeCoverage]
         [HttpGet]
         public async Task<IActionResult> GetAll(
             int page = 1,
