@@ -1,11 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
-namespace CandidateService.DTOs
+namespace GatewayAPI.DTOs.Candidates;
+
+[ExcludeFromCodeCoverage]
+public class BulkCandidateForm
 {
-    [ExcludeFromCodeCoverage]
-    public class BulkCandidateForm
-    {
-        public IFormFile File { get; set; } = null!;
-    }
+    public IFormFile? File { get; set; }
 }

@@ -1,15 +1,13 @@
-﻿using CandidateService.DTOs;
-using GatewayAPI.DTOs.Candidates;
+﻿using GatewayAPI.DTOs.Candidates;
+using GatewayAPI.Helpers;
 using GatewayAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics.CodeAnalysis;
-using System.Net;
-using System.Text.Json;
 
 namespace GatewayAPI.Controllers;
 
 [ApiController]
-[Route("internal/api/candidates")]
+[Route("api/candidates")]
 [ExcludeFromCodeCoverage]
 public class CandidatesController : ControllerBase
 {
@@ -20,49 +18,45 @@ public class CandidatesController : ControllerBase
         _client = client;
     }
 
-    // CREATE 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] DTOs.Candidates.CreateCandidateRequests request)
-    {
-        var response = await _client.CreateAsync(request);
-        return await ProxyResponse(response);
-    }
+    public async Task<IActionResult> Create([FromBody] CreateCandidateRequests request)
+        => await ProxyHelper.ProxyResponse(await _client.CreateAsync(request));
 
-    // GET ALL (PAGINATED) 
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
-    {
-        var response = await _client.GetAllAsync(page, pageSize);
-        return await ProxyResponse(response);
-    }
+        => await ProxyHelper.ProxyResponse(await _client.GetAllAsync(page, pageSize));
 
-    // GET BY ID 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
-    {
-        var response = await _client.GetByIdAsync(id);
-        return await ProxyResponse(response);
-    }
+        => await ProxyHelper.ProxyResponse(await _client.GetByIdAsync(id));
 
-    // UPDATE 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] DTOs.Candidates.CreateCandidateRequests request)
-    {
-        var response = await _client.UpdateAsync(id, request);
-        return await ProxyResponse(response);
-    }
+    public async Task<IActionResult> Update(int id, [FromBody] CreateCandidateRequests request)
+        => await ProxyHelper.ProxyResponse(await _client.UpdateAsync(id, request));
 
-    // DELETE 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
-    {
-        var response = await _client.DeleteAsync(id);
-        return await ProxyResponse(response);
-    }
+        => await ProxyHelper.ProxyResponse(await _client.DeleteAsync(id));
 
-    // BULK UPLOAD (JSON / CSV) 
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] string? skill,
+        [FromQuery] int? minExp,
+        [FromQuery] int? maxExp,
+        [FromQuery] string? primarySkillLevel,
+        [FromQuery] string? start,
+        [FromQuery] string? end,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+        => await ProxyHelper.ProxyResponse(
+            await _client.SearchAsync(skill, minExp, maxExp, primarySkillLevel, page, pageSize, start, end));
+
+    [HttpGet("count")]
+    public async Task<IActionResult> GetCount()
+        => await ProxyHelper.ProxyResponse(await _client.GetCountAsync());
+
     [HttpPost("bulk")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> BulkUpload([FromForm] BulkCandidateForm form)
@@ -70,49 +64,6 @@ public class CandidatesController : ControllerBase
         if (form.File == null || form.File.Length == 0)
             return BadRequest("File is missing.");
 
-        var response = await _client.BulkUploadAsync(form.File);
-        return await ProxyResponse(response);
-    }
-
-
-    //Used to generate proper response body
-    private static async Task<IActionResult> ProxyResponse(HttpResponseMessage response)
-    {
-        // No body (e.g., DELETE 204)
-        if (response.Content == null)
-            return new StatusCodeResult((int)response.StatusCode);
-
-        var contentType = response.Content.Headers.ContentType?.MediaType;
-
-        // Try JSON first
-        if (contentType != null && contentType.Contains("application/json"))
-        {
-            var body = await response.Content.ReadFromJsonAsync<object>();
-
-            if (!response.IsSuccessStatusCode)
-                return new ObjectResult(body)
-                {
-                    StatusCode = (int)response.StatusCode
-                };
-
-            return new ObjectResult(body)
-            {
-                StatusCode = (int)response.StatusCode
-            };
-        }
-
-        // plain text, etc.
-        var text = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-            return new ObjectResult(text)
-            {
-                StatusCode = (int)response.StatusCode
-            };
-
-        return new ObjectResult(text)
-        {
-            StatusCode = (int)response.StatusCode
-        };
+        return await ProxyHelper.ProxyResponse(await _client.BulkUploadAsync(form.File));
     }
 }

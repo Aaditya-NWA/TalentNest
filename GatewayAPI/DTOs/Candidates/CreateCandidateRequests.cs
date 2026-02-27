@@ -9,18 +9,19 @@ public class CreateCandidateRequests
     [Required]
     public string Name { get; set; } = string.Empty;
 
-    [Required, EmailAddress]
+    [Required]
+    [EmailAddress]
     public string MailId { get; set; } = string.Empty;
 
     [Required]
     public string SkillSet { get; set; } = string.Empty;
 
-    [Range(0, int.MaxValue)]
     public int ExperienceMonths { get; set; }
 
-    [Required]
     public DateTime AvailabilityDate { get; set; }
 
     [Required]
-    public string PrimarySkillLevel { get; set; } = string.Empty;
+    [RegularExpression(@"(?i)^p[0-5]$",
+        ErrorMessage = "PrimarySkillLevel must be one of: P0, P1, P2, P3, P4, P5 (case-insensitive).")]
+    public string PrimarySkillLevel { get; set; } = "P0";
 }
