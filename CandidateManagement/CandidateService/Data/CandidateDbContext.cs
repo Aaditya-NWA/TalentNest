@@ -14,10 +14,6 @@ namespace CandidateService.Data
 
         public DbSet<Candidate> Candidates { get; set; } = null!;
         public DbSet<CandidateStaging> CandidateStaging { get; set; } = null!;
-        public DbSet<Interview> Interviews { get; set; } = null!;
-        public DbSet<Requirement> Requirements { get; set; } = null!;
-        public DbSet<Report> Reports { get; set; } = null!;
-        public DbSet<Feedback> Feedback { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
